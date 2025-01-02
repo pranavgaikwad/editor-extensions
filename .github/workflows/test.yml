@@ -1,0 +1,22 @@
+name: test
+
+on:
+  workflow_dispatch:
+
+jobs:
+  kai_build:
+    uses: pranavgaikwad/kai/.github/workflows/build-and-push-binaries.yml@main
+
+  plugin_build:
+    name: plugin build
+    needs: kai_build
+    strategy:
+      matrix:
+        runs_on: ${{ fromJson(needs.kai_build.outputs.matrix_info) }}
+    runs-on: ${{ matrix.runs_on.os }}
+    steps:
+      - name: Download kai binaries
+        uses: actions/download-artifact@v3
+        with:
+          name: kai-rpc-server.${{ env.OS }}-${{ env.OS_ARCH }}.zip
+          path: kai-rpc-server.${{ env.OS }}-${{ env.OS_ARCH }}.zip
