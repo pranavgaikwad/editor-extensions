@@ -135,8 +135,15 @@ const ResolutionPage: React.FC = () => {
                 <ReceivedMessage>Response contains errors:</ReceivedMessage>
                 <ReceivedMessage>
                   <ul>
-                    {resolution.encountered_errors.map((error, index) => (
-                      <li key={index}>{error}</li>
+                    {Object.entries(
+                      resolution.encountered_errors.reduce<Record<string, number>>((acc, error) => {
+                        acc[error] = (acc[error] || 0) + 1;
+                        return acc;
+                      }, {}),
+                    ).map(([errorText, count], index) => (
+                      <li key={index}>
+                        {errorText} {count > 1 && `(x${count})`}
+                      </li>
                     ))}
                   </ul>
                 </ReceivedMessage>
