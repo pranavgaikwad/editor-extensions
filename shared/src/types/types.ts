@@ -139,8 +139,6 @@ export type ServerState =
   | "initial"
   | "configurationNeeded"
   | "configurationReady"
-  | "establishingConnection"
-  | "connectionEstablished"
   | "starting"
   | "startFailed"
   | "running"

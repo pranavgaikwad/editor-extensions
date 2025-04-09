@@ -167,11 +167,9 @@ export class AnalyzerClient {
 
     const pipeName = rpc.generateRandomPipeName();
     // create transport for analyzer rpc server
-    const transports = await rpc.createClientPipeTransport(pipeName).then((transport) => {
-      return transport.onConnected().then((protocol) => {
-        return { reader: protocol[0], writer: protocol[1] };
-      });
-    });
+    const transport = await rpc.createClientPipeTransport(pipeName);
+    const protocol = await transport.onConnected();
+    const transports = { reader: protocol[0], writer: protocol[1] };
 
     try {
       this.modelProvider = await getModelProvider(paths().settingsYaml);
@@ -192,7 +190,6 @@ export class AnalyzerClient {
       throw e;
     }
 
-    this.fireServerStateChange("establishingConnection");
     try {
       // create the rpc connection
       this.rpcConnection = rpc.createMessageConnection(transports.reader, transports.writer);
@@ -201,6 +198,7 @@ export class AnalyzerClient {
         `failed to setup connection to analyzer rpc server [error: ${e}]`,
       );
       this.fireServerStateChange("startFailed");
+      this.stop();
       throw e;
     }
 
@@ -208,7 +206,6 @@ export class AnalyzerClient {
       console.log("got " + method + " with params " + params);
     });
     this.rpcConnection.listen();
-    this.fireServerStateChange("connectionEstablished");
     this.rpcConnection.sendNotification("start", { type: "start" });
 
     if (getConfigLoggingTraceMessageConnection()) {
@@ -337,13 +334,10 @@ export class AnalyzerClient {
    * Will only run if the sever state is: `running`, `initialized`
    */
   public async shutdown(): Promise<void> {
-    switch (this.serverState) {
-      case "connectionEstablished":
-      case "running":
-        break;
-      default:
-        return;
+    if (this.serverState !== "running") {
+      return;
     }
+
     try {
       this.outputChannel.appendLine(`Requesting kai rpc server shutdown...`);
       await this.rpcConnection?.sendRequest("analysis_engine.Stop", {});
