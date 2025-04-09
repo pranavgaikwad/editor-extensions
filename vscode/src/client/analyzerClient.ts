@@ -75,7 +75,6 @@ export class AnalyzerClient {
       this.outputChannel.appendLine(`serverState change from [${draft.serverState}] to [${state}]`);
       draft.serverState = state;
       draft.isStartingServer = state === "starting";
-      draft.isInitializingServer = state === "initializing";
     });
   }
 
@@ -166,9 +165,17 @@ export class AnalyzerClient {
     this.outputChannel.appendLine(`Starting the analyzer rpc server ...`);
     this.fireServerStateChange("starting");
 
+    const pipeName = rpc.generateRandomPipeName();
+    // create transport for analyzer rpc server
+    const transports = await rpc.createClientPipeTransport(pipeName).then((transport) => {
+      return transport.onConnected().then((protocol) => {
+        return { reader: protocol[0], writer: protocol[1] };
+      });
+    });
+
     try {
       this.modelProvider = await getModelProvider(paths().settingsYaml);
-      const [analyzerRpcServer, pid] = await this.startProcessAndLogStderr();
+      const [analyzerRpcServer, pid] = await this.startProcessAndLogStderr(pipeName);
 
       this.analyzerRpcServer = analyzerRpcServer;
       this.outputChannel.appendLine(`analyzer rpc server successfully started [pid: ${pid}]`);
@@ -185,14 +192,8 @@ export class AnalyzerClient {
       throw e;
     }
 
+    this.fireServerStateChange("establishingConnection");
     try {
-      // create transport for analyzer rpc server
-      const pipeName = rpc.generateRandomPipeName();
-      const transports = await rpc.createClientPipeTransport(pipeName).then((transport) => {
-        return transport.onConnected().then((protocol) => {
-          return { reader: protocol[0], writer: protocol[1] };
-        });
-      });
       // create the rpc connection
       this.rpcConnection = rpc.createMessageConnection(transports.reader, transports.writer);
     } catch (e) {
@@ -207,6 +208,7 @@ export class AnalyzerClient {
       console.log("got " + method + " with params " + params);
     });
     this.rpcConnection.listen();
+    this.fireServerStateChange("connectionEstablished");
     this.rpcConnection.sendNotification("start", { type: "start" });
 
     if (getConfigLoggingTraceMessageConnection()) {
@@ -233,10 +235,11 @@ export class AnalyzerClient {
    * and wait (up to a maximum time) for the server to report itself ready.
    */
   protected async startProcessAndLogStderr(
+    pipeName: string,
     maxTimeToWaitUntilReady: number = 30_000,
   ): Promise<[ChildProcessWithoutNullStreams, number | undefined]> {
     const serverPath = this.getAnalyzerPath();
-    const serverArgs = this.getAnalyzerServerArgs();
+    const serverArgs = this.getAnalyzerServerArgs(pipeName);
     // TODO (pgaikwad): address the env vars
     const serverEnv = this.getKaiRpcServerEnv();
 
@@ -334,7 +337,13 @@ export class AnalyzerClient {
    * Will only run if the sever state is: `running`, `initialized`
    */
   public async shutdown(): Promise<void> {
-    // TODO: Ensure serverState is running || initialized
+    switch (this.serverState) {
+      case "connectionEstablished":
+      case "running":
+        break;
+      default:
+        return;
+    }
     try {
       this.outputChannel.appendLine(`Requesting kai rpc server shutdown...`);
       await this.rpcConnection?.sendRequest("analysis_engine.Stop", {});
@@ -629,8 +638,10 @@ export class AnalyzerClient {
   }
 
   //TODO (pgaikwad) - add log level to analyzer server
-  protected getAnalyzerServerArgs(): string[] {
+  protected getAnalyzerServerArgs(pipeName: string): string[] {
     return [
+      "--pipePath",
+      pipeName,
       "--source-directory",
       getConfigLogLevel(),
       "--log-file",
