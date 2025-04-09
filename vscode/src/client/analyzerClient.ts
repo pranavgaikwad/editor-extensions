@@ -185,11 +185,29 @@ export class AnalyzerClient {
       throw e;
     }
 
-    // Set up the JSON-RPC connection
-    this.rpcConnection = rpc.createMessageConnection(
-      new rpc.StreamMessageReader(this.analyzerRpcServer.stdout),
-      new rpc.StreamMessageWriter(this.analyzerRpcServer.stdin),
-    );
+    try {
+      // create transport for analyzer rpc server
+      const pipeName = rpc.generateRandomPipeName();
+      const transports = await rpc.createClientPipeTransport(pipeName).then((transport) => {
+        return transport.onConnected().then((protocol) => {
+          return { reader: protocol[0], writer: protocol[1] };
+        });
+      });
+      // create the rpc connection
+      this.rpcConnection = rpc.createMessageConnection(transports.reader, transports.writer);
+    } catch (e) {
+      this.outputChannel.appendLine(
+        `failed to setup connection to analyzer rpc server [error: ${e}]`,
+      );
+      this.fireServerStateChange("startFailed");
+      throw e;
+    }
+
+    this.rpcConnection.onNotification(function (method: string, params: any) {
+      console.log("got " + method + " with params " + params);
+    });
+    this.rpcConnection.listen();
+    this.rpcConnection.sendNotification("start", { type: "start" });
 
     if (getConfigLoggingTraceMessageConnection()) {
       this.rpcConnection.trace(
@@ -199,6 +217,8 @@ export class AnalyzerClient {
     }
 
     /**
+     * TODO (pgaikwad): this needs to change when we
+     * move llm calls to the IDE
      * Handle server generated progress ChatMessages.
      */
     this.rpcConnection.onNotification("my_progress", (chatMessage: ChatMessage) => {
