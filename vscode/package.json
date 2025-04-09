@@ -441,14 +441,7 @@
       "properties": {
         "konveyor.logLevel": {
           "type": "string",
-          "enum": [
-            "TRACE",
-            "DEBUG",
-            "INFO",
-            "WARN",
-            "ERROR",
-            "CRITICAL"
-          ],
+          "pattern": "^(TRACE|DEBUG|INFO|WARN|ERROR|CRITICAL)(?:[+-]\\d+)?$",
           "default": "DEBUG",
           "description": "Logging level used for the server binaries",
           "scope": "window",

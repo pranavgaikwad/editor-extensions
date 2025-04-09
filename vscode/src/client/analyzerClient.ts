@@ -147,7 +147,6 @@ export class AnalyzerClient {
    *
    * Server state changes:
    *   - `starting`
-   *   - `readyToInitialize`
    *   - `startFailed`
    *   - `stopped`: When the process exits (clean shutdown, aborted, killed, ...) the server
    *                states changes to `stopped` via the process event `exit`
@@ -170,13 +169,6 @@ export class AnalyzerClient {
     try {
       this.modelProvider = await getModelProvider(paths().settingsYaml);
       const [analyzerRpcServer, pid] = await this.startProcessAndLogStderr();
-
-      analyzerRpcServer.on("exit", (code, signal) => {
-        this.outputChannel.appendLine(
-          `analyzer rpc server exited [signal: ${signal}, code: ${code}]`,
-        );
-        this.fireServerStateChange("stopped");
-      });
 
       this.analyzerRpcServer = analyzerRpcServer;
       this.outputChannel.appendLine(`analyzer rpc server successfully started [pid: ${pid}]`);
@@ -239,20 +231,26 @@ export class AnalyzerClient {
       env: serverEnv,
     });
 
-    const pid = await new Promise<number | undefined>((resolve, reject) => {
-      analyzerRpcServer.on("spawn", () => {
-        this.outputChannel.appendLine(
-          `analyzer rpc server has been spawned! [${analyzerRpcServer.pid}]`,
-        );
-        resolve(analyzerRpcServer.pid);
-      });
+    let processStarted = false;
 
-      analyzerRpcServer.on("error", (err) => {
-        const message = `error in process [${analyzerRpcServer.spawnfile}]: ${err}`;
-        this.outputChannel.appendLine(`[error] - ${message}`);
+    analyzerRpcServer.on("error", (err) => {
+      const message = `error in process [${analyzerRpcServer.spawnfile}]: ${err}`;
+      this.outputChannel.appendLine(`[error] - ${message}`);
+      analyzerRpcServer?.emit("startFailed");
+      this.fireServerStateChange("startFailed");
+    });
+
+    analyzerRpcServer.on("exit", (code, signal) => {
+      this.outputChannel.appendLine(
+        `analyzer rpc server exited [signal: ${signal}, code: ${code}]`,
+      );
+      if (!processStarted) {
+        analyzerRpcServer?.emit("startFailed");
         this.fireServerStateChange("startFailed");
-        reject(err);
-      });
+      } else {
+        this.fireServerStateChange("stopped");
+        vscode.window.showInformationMessage("Analyzer rpc server has exited!");
+      }
     });
 
     let seenServerIsReady = false;
@@ -262,7 +260,8 @@ export class AnalyzerClient {
 
       if (!seenServerIsReady && asString.match(/.*Starting Server/)) {
         seenServerIsReady = true;
-        analyzerRpcServer?.emit("serverReportsReady", pid);
+        processStarted = true;
+        analyzerRpcServer?.emit("serverReportsReady", analyzerRpcServer.pid);
         this.fireServerStateChange("running");
       }
     });
@@ -271,22 +270,31 @@ export class AnalyzerClient {
       new Promise<string>((resolve) => {
         if (seenServerIsReady) {
           resolve("ready");
-        } else {
-          analyzerRpcServer!.on("serverReportsReady", (_pid) => {
-            resolve("ready");
-          });
         }
+        analyzerRpcServer!.on("serverReportsReady", (_pid) => {
+          resolve("ready");
+        });
+        analyzerRpcServer!.on("startFailed", (_pid) => {
+          resolve("failed");
+        });
       }),
       setTimeout(maxTimeToWaitUntilReady, "timeout"),
     ]);
 
-    if (readyOrTimeout === "timeout") {
-      // TODO: Handle the case where the server is not ready to initialize
-      this.outputChannel.appendLine(
-        `waited ${maxTimeToWaitUntilReady}ms for the analyzer rpc server to be ready, continuing anyway`,
-      );
-    } else if (readyOrTimeout === "ready") {
-      this.outputChannel.appendLine(`*** analyzer rpc server [${pid}] reports ready!`);
+    const pid = analyzerRpcServer?.pid;
+
+    switch (readyOrTimeout) {
+      case "timeout":
+        this.outputChannel.appendLine(
+          `waited ${maxTimeToWaitUntilReady}ms for the analyzer rpc server to be ready, exiting...`,
+        );
+        throw new Error("Analyzer rpc server failed to start");
+      case "ready":
+        this.outputChannel.appendLine(`*** analyzer rpc server [${pid}] reports ready!`);
+        break;
+      default:
+        this.outputChannel.appendLine(`*** analyzer rpc server [${pid}] failed to start!`);
+        throw new Error("Analyzer rpc server failed to start");
     }
 
     return [analyzerRpcServer, pid];
@@ -309,7 +317,7 @@ export class AnalyzerClient {
     // TODO: Ensure serverState is running || initialized
     try {
       this.outputChannel.appendLine(`Requesting kai rpc server shutdown...`);
-      await this.rpcConnection?.sendRequest("shutdown", {});
+      await this.rpcConnection?.sendRequest("analysis_engine.Stop", {});
     } catch (err: any) {
       this.outputChannel.appendLine(`Error during shutdown: ${err.message}`);
       vscode.window.showErrorMessage("Shutdown failed. See the output channel for details.");
@@ -606,12 +614,12 @@ export class AnalyzerClient {
       "--source-directory",
       getConfigLogLevel(),
       "--log-file",
-      paths().serverLogs.fsPath,
+      vscode.Uri.joinPath(paths().serverLogs, "analyzer.log").fsPath,
       "--lspServerPath",
       this.assetPaths.jdtlsBin,
       "--bundles",
       this.assetPaths.jdtlsBundleJars.join(","),
-      "--depOpenSourceLabelsPath",
+      "--depOpenSourceLabelsFile",
       this.assetPaths.openSourceLabelsFile,
       ...this.getRulesetsPath()
         .flatMap((path) => ["--rules", path])
