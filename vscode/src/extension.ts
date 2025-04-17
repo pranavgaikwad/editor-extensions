@@ -118,7 +118,7 @@ class VsCodeExtension {
         }),
       );
 
-      registerAnalysisTrigger(this.listeners);
+      registerAnalysisTrigger(this.listeners, this.state);
 
       this.listeners.push(
         vscode.workspace.onDidSaveTextDocument((doc) => {

@@ -19,6 +19,7 @@ import { allIncidents } from "../issueView";
 import { Immutable } from "immer";
 import { countIncidentsOnPaths } from "../analysis";
 import { createConnection, Socket } from "node:net";
+import { FileChange } from "./types";
 
 const uid = (() => {
   let counter = 0;
@@ -294,6 +295,23 @@ export class AnalyzerClient {
 
   public isServerRunning(): boolean {
     return !!this.analyzerRpcServer && !this.analyzerRpcServer.killed;
+  }
+
+  public async notifyFileChanges(fileChanges: FileChange[]): Promise<void> {
+    if (this.serverState !== "running" || !this.analyzerRpcConnection) {
+      this.outputChannel.appendLine("kai rpc server is not running, skipping notifyFileChanged.");
+      return;
+    }
+    const changes = fileChanges.map((change) => ({
+      path: change.path.fsPath,
+      content: change.content,
+      saved: change.saved,
+    }));
+    if (changes.length > 0) {
+      await this.analyzerRpcConnection!.sendRequest("analysis_engine.NotifyFileChanges", {
+        changes: changes,
+      });
+    }
   }
 
   /**
