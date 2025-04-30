@@ -27,6 +27,13 @@ import {
   GetSolutionResult,
 } from "@editor-extensions/shared";
 import {
+  type KaiWorkflowMessage,
+  KaiWorkflowMessageType,
+  AdditionalInfoWorkflow,
+  type KaiWorkflow,
+  type AdditionalInfoWorkflowInput,
+} from "@editor-extensions/agentic";
+import {
   applyAll,
   discardAll,
   copyDiff,
@@ -43,6 +50,7 @@ import {
   updateGetSolutionMaxDepth,
   updateGetSolutionMaxIterations,
   updateGetSolutionMaxPriority,
+  getConfigAgentMode,
 } from "./utilities/configuration";
 import { runPartialAnalysis } from "./analysis";
 import { fixGroupOfIncidents, IncidentTypeItem } from "./issueView";
@@ -50,13 +58,13 @@ import { paths } from "./paths";
 import { checkIfExecutable, copySampleProviderSettings } from "./utilities/fileUtils";
 import { handleConfigureCustomRules } from "./utilities/profiles/profileActions";
 import { ChatOpenAI, AzureChatOpenAI } from "@langchain/openai";
-import { ChatBedrockConverse } from "@langchain/aws";
+import { ChatBedrockConverse, type ChatBedrockConverseInput } from "@langchain/aws";
 import { ChatGoogleGenerativeAI } from "@langchain/google-genai";
 import { ChatDeepSeek } from "@langchain/deepseek";
 import { ChatOllama } from "@langchain/ollama";
 import { SystemMessage, HumanMessage } from "@langchain/core/messages";
 import { getModelProvider } from "./client/modelProvider";
-import { createPatch } from "diff";
+import { createPatch, createTwoFilesPatch } from "diff";
 import path from "node:path";
 
 const isWindows = process.platform === "win32";
@@ -175,17 +183,21 @@ const commandsMap: (state: ExtensionState) => {
             break;
 
           case "ChatBedrock":
-            model = new ChatBedrockConverse({
+            const config: ChatBedrockConverseInput = {
               model: modelProvider.modelProvider.args["model_id"],
               region: modelProvider.env.AWS_DEFAULT_REGION,
-              credentials: {
-                accessKeyId: modelProvider.env.AWS_ACCESS_KEY_ID,
-                secretAccessKey: modelProvider.env.AWS_SECRET_ACCESS_KEY,
-              },
               streaming: true,
               temperature: modelProvider.modelProvider.args["temperature"],
               maxTokens: modelProvider.modelProvider.args["max_tokens"],
-            });
+            };
+            // aws credentials can be specified globally using a credentials file
+            if (modelProvider.env.AWS_ACCESS_KEY_ID && modelProvider.env.AWS_SECRET_ACCESS_KEY) {
+              config.credentials = {
+                accessKeyId: modelProvider.env.AWS_ACCESS_KEY_ID,
+                secretAccessKey: modelProvider.env.AWS_SECRET_ACCESS_KEY,
+              };
+            }
+            model = new ChatBedrockConverse(config);
             break;
 
           case "ChatGoogleGenerativeAI":
@@ -227,6 +239,17 @@ const commandsMap: (state: ExtensionState) => {
           return;
         }
 
+        // start initing the workflow in the background
+        let additionalInfoWorkflow: KaiWorkflow | undefined;
+        let agentInit: Promise<void> | undefined;
+        if (getConfigAgentMode()) {
+          additionalInfoWorkflow = new AdditionalInfoWorkflow();
+          agentInit = additionalInfoWorkflow.init({
+            model: model,
+            workspaceDir: state.data.workspaceRoot,
+          });
+        }
+
         // Prepare the system prompt
         const systemPrompt = `
 You are an experienced java developer, who specializes in migrating code from ${profileName}`;
@@ -235,6 +258,10 @@ You are an experienced java developer, who specializes in migrating code from ${
         // Process each file's incidents
         const allDiffs: { original: string; modified: string; diff: string }[] = [];
         const modifiedFiles = new Set<string>();
+
+        // Input needed for agent workflow
+        const allResponses: string[] = [];
+        const allRelativePaths: string[] = [];
 
         for (const [uri, fileIncidents] of Object.entries(incidentsByUri)) {
           const parsedURI = Uri.parse(uri);
@@ -305,7 +332,7 @@ Write the step by step reasoning in this markdown section. If you are unsure of 
 
 ## Additional Information (optional)
 
-If you have any additional details or steps that need to be performed, put it here.`;
+If you have any additional details or steps that need to be performed, put it here. Do not summarize any of the changes you already made in this section. Only mention any additional changes needed.`;
           console.log(humanPrompt);
 
           // Stream the response
@@ -324,7 +351,8 @@ If you have any additional details or steps that need to be performed, put it he
               draft.chatMessages[draft.chatMessages.length - 1].value.message += content;
             });
           }
-
+          allResponses.push(fullResponse);
+          allRelativePaths.push(relativePath);
           // Match any language identifier after the backticks
           const codeMatch = fullResponse.match(/```\w*\n([\s\S]*?)\n```/);
           if (codeMatch) {
@@ -342,6 +370,138 @@ If you have any additional details or steps that need to be performed, put it he
             });
             modifiedFiles.add(parsedURI.fsPath);
           }
+        }
+
+        if (additionalInfoWorkflow && agentInit) {
+          let lastMessageId: string = "0";
+          const agentModifiedFiles: Map<
+            Uri,
+            {
+              content: string;
+              isNew: boolean;
+            }
+          > = new Map<Uri, { content: string; isNew: boolean }>();
+          // listen on agents events
+          additionalInfoWorkflow.on("workflowMessage", async (msg: KaiWorkflowMessage) => {
+            switch (msg.type) {
+              case KaiWorkflowMessageType.UserInteraction: {
+                switch (msg.data.type) {
+                  case "yesNo":
+                    state.mutateData((draft) => {
+                      draft.chatMessages.push({
+                        kind: ChatMessageType.String,
+                        messageToken: msg.id,
+                        timestamp: new Date().toISOString(),
+                        value: {
+                          message: `We found more issues we think we can fix. Proceeding to fix...`,
+                        },
+                      });
+                    });
+                    msg.data.response = {
+                      yesNo: true,
+                    };
+                    additionalInfoWorkflow.resolveUserInteraction(msg);
+                }
+                break;
+              }
+              case KaiWorkflowMessageType.LLMResponseChunk: {
+                const chunk = msg.data;
+                const content =
+                  typeof chunk.content === "string" ? chunk.content : JSON.stringify(chunk.content);
+                if (msg.id !== lastMessageId) {
+                  state.mutateData((draft) => {
+                    draft.chatMessages.push({
+                      kind: ChatMessageType.String,
+                      messageToken: msg.id,
+                      timestamp: new Date().toISOString(),
+                      value: {
+                        message: content,
+                      },
+                    });
+                  });
+                  lastMessageId = msg.id;
+                } else {
+                  state.mutateData((draft) => {
+                    draft.chatMessages[draft.chatMessages.length - 1].value.message += content;
+                  });
+                }
+                break;
+              }
+              case KaiWorkflowMessageType.ModifiedFile: {
+                const fPath = msg.data.path;
+                const content = msg.data.content;
+                const uri = Uri.file(fPath);
+                let isNew = false;
+                try {
+                  try {
+                    await workspace.fs.stat(uri);
+                  } catch (err) {
+                    if (
+                      (err as any).code === "FileNotFound" ||
+                      (err as any).name === "EntryNotFound"
+                    ) {
+                      isNew = true;
+                    } else {
+                      throw err;
+                    }
+                  }
+                  if (!agentModifiedFiles.has(uri)) {
+                    agentModifiedFiles.set(uri, {
+                      content,
+                      isNew,
+                    });
+                  }
+                } catch (err) {
+                  console.log(`Failed to write file by the agent - ${err}`);
+                }
+                break;
+              }
+            }
+          });
+
+          try {
+            await agentInit;
+            await additionalInfoWorkflow.run({
+              migrationHint: profileName,
+              previousResponses: {
+                responses: allResponses,
+                files: allRelativePaths,
+              },
+              programmingLanguage: "Java",
+            } as AdditionalInfoWorkflowInput);
+          } catch (err) {
+            console.error(`Error in running the agent - ${err}`);
+            window.showInformationMessage(`We encountered an error running the agent.`);
+          }
+
+          // process diffs from agent workflow
+          await Promise.all(
+            Array.from(agentModifiedFiles.entries()).map(async ([uri, { content, isNew }]) => {
+              const relativePath = workspace.asRelativePath(uri);
+              try {
+                if (isNew) {
+                  allDiffs.push({
+                    diff: createTwoFilesPatch("", relativePath, "", content),
+                    modified: relativePath,
+                    original: "",
+                  });
+                } else {
+                  const originalContent = await workspace.fs.readFile(uri);
+                  allDiffs.push({
+                    diff: createPatch(
+                      relativePath,
+                      new TextDecoder().decode(originalContent),
+                      content,
+                    ),
+                    modified: relativePath,
+                    original: relativePath,
+                  });
+                }
+              } catch (err) {
+                console.error(`Error in processing diff - ${err}`);
+              }
+            }),
+          );
         }
 
         if (allDiffs.length === 0) {

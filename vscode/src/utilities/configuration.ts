@@ -66,6 +66,7 @@ export const getConfigSolutionMaxEffortValue = (): number | undefined => {
 };
 export const getConfigMaxLLMQueries = (): number | undefined =>
   getConfigValue<number | null>("kai.getSolutionMaxLLMQueries") ?? undefined;
+export const getConfigAgentMode = (): boolean => getConfigValue<boolean>("kai.agentMode") ?? false;
 
 export const getGenAIConfigStatus = (filepath: string): GenAIConfigStatus => {
   try {
