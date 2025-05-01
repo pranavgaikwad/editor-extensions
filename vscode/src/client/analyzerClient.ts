@@ -11,7 +11,7 @@ import {
   SolutionState,
   Violation,
 } from "@editor-extensions/shared";
-import { paths, fsPaths } from "../paths";
+import { paths, fsPaths, ignoresToExcludedPaths } from "../paths";
 import { Extension } from "../helpers/Extension";
 import { buildAssetPaths, AssetPaths } from "./paths";
 import { getConfigAnalyzerPath, getConfigKaiDemoMode, isAnalysisResponse } from "../utilities";
@@ -355,6 +355,7 @@ export class AnalyzerClient {
             label_selector: activeProfile.labelSelector,
             included_paths: filePaths?.map((uri) => uri.fsPath),
             reset_cache: !(filePaths && filePaths.length > 0),
+            excluded_paths: ignoresToExcludedPaths(),
           };
           this.outputChannel.appendLine(
             `Sending 'analysis_engine.Analyze' request with params: ${JSON.stringify(

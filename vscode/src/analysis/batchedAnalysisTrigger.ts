@@ -14,7 +14,7 @@ export class BatchedAnalysisTrigger {
     private readonly extensionState: ExtensionState,
     private readonly enableHotRerun: boolean = true,
   ) {
-    this.analysisBackoff = new BackoffManager(5000, 30000, 10000);
+    this.analysisBackoff = new BackoffManager(3000, 30000, 10000);
     this.notifyFileChangesBackoff = new BackoffManager(1000, 10000, 10000);
     this.extensionState = extensionState;
     this.enableHotRerun = enableHotRerun;
@@ -22,6 +22,9 @@ export class BatchedAnalysisTrigger {
 
   async notifyFileChanges(change: FileChange) {
     if (this.enableHotRerun) {
+      this.extensionState.mutateData((draft) => {
+        draft.isAnalysisScheduled = true;
+      });
       // hot re-run if enabled
       this.notifyFileChangesQueue.set(change.path.fsPath, change);
       this.scheduleNotifyFileChanges();
@@ -30,7 +33,7 @@ export class BatchedAnalysisTrigger {
     } else if (change.saved) {
       // when a file is saved, we still want to call analysis
       this.analysisFileChangesQueue.add(change.path);
-      this.schedulePartialAnalysis();
+      this.runPartialAnalysis();
     }
   }
 
@@ -39,6 +42,7 @@ export class BatchedAnalysisTrigger {
       if (this.extensionState.data.isAnalyzing || this.analysisBackoff.isRunningCallback()) {
         // if there is an analysis in progress,
         // postpone notifying file changes
+        this.notifyFileChangesBackoff.increaseBackoff();
         this.scheduleNotifyFileChanges();
         return;
       }
@@ -49,10 +53,6 @@ export class BatchedAnalysisTrigger {
         // no changes to notify
         return;
       }
-      console.log(
-        "notifyFileChanges",
-        changes.map((c) => c.path.fsPath),
-      );
       try {
         await this.extensionState.analyzerClient.notifyFileChanges(changes);
         for (const change of changes) {
@@ -61,7 +61,6 @@ export class BatchedAnalysisTrigger {
       } catch (error) {
         console.error("error notifying file changes", error);
       }
-      this.notifyFileChangesBackoff.increaseBackoff();
     });
   }
 
@@ -73,31 +72,34 @@ export class BatchedAnalysisTrigger {
       ) {
         // if there is an analysis or notifyFileChanges
         // in progress, postpone the partialAnalysis
+        this.analysisBackoff.increaseBackoff();
         this.schedulePartialAnalysis();
         return;
       }
-      const changedFiles = Array.from(this.analysisFileChangesQueue).filter(
-        (uri) => !isUriIgnored(uri),
-      );
-      if (changedFiles.length < 1) {
-        // no changes to analyze
-        return;
-      }
-      console.log(
-        "runAnalysis",
-        changedFiles.map((f) => f.fsPath),
-      );
-      try {
-        const response = await this.extensionState.analyzerClient.runAnalysis(changedFiles);
-        console.log("runAnalysis response", response);
-        for (const file of changedFiles) {
-          this.analysisFileChangesQueue.delete(file);
-        }
-      } catch (error) {
-        console.error("error running analysis", error);
-      }
-      this.analysisBackoff.increaseBackoff();
+      await this.runPartialAnalysis();
+      this.extensionState.mutateData((draft) => {
+        draft.isAnalysisScheduled = false;
+      });
     });
+  }
+
+  public async runPartialAnalysis() {
+    const changedFiles = Array.from(this.analysisFileChangesQueue).filter(
+      (uri) => !isUriIgnored(uri),
+    );
+    if (changedFiles.length < 1) {
+      // no changes to analyze
+      return;
+    }
+    try {
+      const response = await this.extensionState.analyzerClient.runAnalysis(changedFiles);
+      console.log("runAnalysis response", response);
+      for (const file of changedFiles) {
+        this.analysisFileChangesQueue.delete(file);
+      }
+    } catch (error) {
+      console.error("error running analysis", error);
+    }
   }
 
   dispose() {
