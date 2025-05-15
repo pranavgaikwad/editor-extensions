@@ -182,7 +182,7 @@ const commandsMap: (state: ExtensionState) => {
             });
             break;
 
-          case "ChatBedrock":
+          case "ChatBedrock": {
             const config: ChatBedrockConverseInput = {
               model: modelProvider.modelProvider.args["model_id"],
               region: modelProvider.env.AWS_DEFAULT_REGION,
@@ -199,7 +199,7 @@ const commandsMap: (state: ExtensionState) => {
             }
             model = new ChatBedrockConverse(config);
             break;
-
+          }
           case "ChatGoogleGenerativeAI":
             model = new ChatGoogleGenerativeAI({
               model: modelProvider.modelProvider.args["model_id"],
