@@ -67,14 +67,22 @@ export abstract class BaseNode extends KaiWorkflowEventEmitter {
       // emitResponseChunks controls whether AImessagechunks are emitted as events
       emitResponseChunks?: boolean;
       // toolsSelector matches tool names to enable
-      toolsSelector?: string[];
+      toolsSelectors?: string[];
     },
     options?: Partial<BaseChatModelCallOptions> | undefined,
   ): Promise<AIMessage | AIMessageChunk | undefined> {
     const messageId = this.newMessageId();
-    const { enableTools = true, emitResponseChunks = true } = streamOptions || {};
+    const {
+      enableTools = true,
+      emitResponseChunks = true,
+      toolsSelectors = [],
+    } = streamOptions || {};
     try {
-      const { inputWithTools, runnable } = this.getRunnableWithTools(input, enableTools);
+      const { inputWithTools, runnable } = this.getRunnableWithTools(
+        input,
+        enableTools,
+        toolsSelectors,
+      );
 
       // fallback to invoke when we cannot stream tool calls
       if (
@@ -436,17 +444,20 @@ Make sure you always use \`\`\` at the start and end of the JSON block to clearl
   }
 
   private getToolsMatchingSelectors(selectors?: string[]): DynamicStructuredTool[] {
-    if (!selectors || selectors.length === 0) {
+    if (!selectors || !selectors.length) {
       return this.tools;
     }
-    return this.tools.filter((t) => {
-      selectors?.forEach((s) => {
-        if (s === t.name) {
+    return this.tools.filter((tool) => {
+      selectors.some((selector) => {
+        if (selector === tool.name) {
           return true;
         }
+
         try {
-          const pattern = new RegExp(s);
-          return pattern.test(t.name);
+          const pattern = new RegExp(selector);
+          if (pattern.test(tool.name)) {
+            return true;
+          }
         } catch {
           return false;
         }

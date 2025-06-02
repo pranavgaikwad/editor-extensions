@@ -3,6 +3,9 @@ import { Annotation, MessagesAnnotation } from "@langchain/langgraph";
 import { BaseInputMetaState } from "./base";
 import { type KaiModifiedFile } from "../types";
 
+// different types of agents available
+export type AgentName = "generalFix" | "dependency" | "properties";
+
 // input state for node that plans the fixes for given diagnostics issues
 export const DiagnosticsPlannerInputState = Annotation.Root({
   ...BaseInputMetaState.spec,
@@ -11,12 +14,7 @@ export const DiagnosticsPlannerInputState = Annotation.Root({
   // list of diagnostics issues to fix
   plannerInputTasks: Annotation<{ uri: string; tasks: string[] } | undefined>,
   // list of known agents the planner can delegate tasks to
-  plannerInputAgents: Annotation<
-    Array<{
-      name: string;
-      description: string;
-    }>
-  >,
+  plannerInputAgents: Annotation<Array<AgentName>>,
 });
 
 // output state for the planner node

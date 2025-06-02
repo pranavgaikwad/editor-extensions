@@ -22,8 +22,8 @@ import { modelHealthCheck } from "../utils";
 import { FileSystemTools } from "../tools/filesystem";
 import { KaiWorkflowEventEmitter } from "../eventEmitter";
 import { AnalysisIssueFix } from "../nodes/analysisIssueFix";
-import { DiagnosticsIssueFix, AgentName } from "../nodes/diagnosticsIssueFix";
-import { DiagnosticsOrchestratorState } from "../schemas/diagnosticsIssueFix";
+import { DiagnosticsIssueFix } from "../nodes/diagnosticsIssueFix";
+import { AgentName, DiagnosticsOrchestratorState } from "../schemas/diagnosticsIssueFix";
 
 export interface KaiInteractiveWorkflowInput extends KaiWorkflowInput {
   programmingLanguage: string;
@@ -286,12 +286,7 @@ export class KaiInteractiveWorkflow
         (input.enableAdditionalInformation ?? false) ? additionalInformation : undefined,
       migrationHint: input.migrationHint,
       programmingLanguage: input.programmingLanguage,
-      plannerInputAgents: [
-        {
-          name: "generalFix",
-          description: "General agent to be used when no other agent is available",
-        },
-      ],
+      plannerInputAgents: ["generalFix"],
       plannerInputBackground: analysisFixOutputState.summarizedHistory,
       enableDiagnosticsFixes: input.enableDiagnostics ?? false,
       // internal fields

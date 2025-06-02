@@ -16,6 +16,7 @@ import {
   type PendingUserInteraction,
 } from "../types";
 import {
+  type AgentName,
   type DiagnosticsPlannerInputState,
   type DiagnosticsPlannerOutputState,
   type DiagnosticsOrchestratorState,
@@ -23,8 +24,6 @@ import {
   type GeneralIssueFixOutputState,
 } from "../schemas/diagnosticsIssueFix";
 import { BaseNode, type ModelInfo } from "./base";
-
-export type AgentName = "generalFix" | "dependency" | "properties";
 
 type PlannerResponseParserState = "name" | "instructions";
 
@@ -198,18 +197,16 @@ export class DiagnosticsIssueFix extends BaseNode {
     }
 
     const sys_message = new SystemMessage(
-      `You are an experienced architect overlooking migration of a ${state.programmingLanguage} application from ${state.migrationHint}.`,
+      `You are an experienced architect overlooking migration of a ${state.programmingLanguage} application from ${state.migrationHint}. Your expertise lies in efficiently delegating tasks to the most appropriate specialist to ensure optimal problem resolution.`,
     );
 
     let agentDescriptions = "";
     state.plannerInputAgents.forEach((a) => {
-      agentDescriptions += `\n-\tName: ${a.name}\tDescription: ${a.description}`;
+      agentDescriptions += `\n-\tName: ${a}\tDescription: ${DiagnosticsIssueFix.SubAgents[a]}`;
     });
 
     const human_message =
-      new HumanMessage(`You are a highly experienced Software Architect, known for your keen analytical skills and deep understanding of various technical domains.\
-Your expertise lies in efficiently delegating tasks to the most appropriate specialist to ensure optimal problem resolution.\
-You have a roster of specialized agents at your disposal, each with unique capabilities and areas of focus.\
+      new HumanMessage(`You have a roster of specialized agents at your disposal, each with unique capabilities and areas of focus.\
 For context, you are also given background information on changes we made so far to migrate the application.\
 
 **Here is the list of available agents, along with their descriptions:**
@@ -228,18 +225,32 @@ Make sure your instructions are specific to fixing issues in this file.`
 **Previous context about migration**
 ${state.plannerInputBackground}
 
-Your task is to carefully analyze each issue in the list and determine the most suitable agent to address it.\
-You will output the **name of the selected agent** on a new line followed by **specific, clear instructions** tailored to that agent's expertise on the next line, each with a section header explained in the format below.\
-The instructions should detail how each agent should approach and solve the problem.\
+Your primary task is to carefully analyze **each individual issue** in the list.\
+For each issue, you must determine the most suitable specialized agent to address it. You should group related issues that can be efficiently solved by the same agent, ensuring the **most specific agent** is chosen for the grouped issues. If an an issue, or a group of issues, requires a different specialist, you **must** create a new delegation block for that specialist.
+Your instructions to each agent must be specific, clear, and tailored to their expertise, detailing how they should approach and solve the assigned problems. Make sure your instructions take into account previous changes we made for migrating the project and align with the overall migration effort. Consider the nuances of each issue and match it precisely with the described capabilities of the agents.\
+If no specialized agent is a perfect fit for an issue or a group of issues, direct it to the generalist agent with comprehensive instructions.
 **Make sure** your instructions take into account previous changes we made for migrating the project. They should align with the overall migration effort.\
 Consider the nuances of each issue and match it precisely with the described capabilities of the agents.\
 If no specialized agent is a perfect fit, direct the issue to the generalist agent with comprehensive instructions.\
-Your response **must** be in following format:
+**Make sure all issues from the list are addressed.** You will likely need to delegate to more than one agent to address all issues effectively.
 
+Your response **must** consist of one or more distinct blocks, each delegating tasks to a specific agent. Each block **must** follow this exact format:
 * Name
 <agent_name_here_on_newline>
 * Instructions
-<detailed_instructions_here_on_newline>`);
+<detailed_instructions_here_on_newline>
+
+**Example of expected output structure (if multiple agents are chosen to address different issues):**
+* Name
+<Agent_A_Name>
+* Instructions
+Instructions for Agent A to solve Issue 1, Issue 2, etc. (mention specific issues)
+
+* Name
+<Agent_B_Name>
+* Instructions
+Instructions for Agent B to solve Issue 3, Issue 4, etc. (mention specific issues)
+`);
 
     const response = await this.streamOrInvoke([sys_message, human_message], {
       enableTools: false,
@@ -268,8 +279,9 @@ You are given notes detailing additional changes that need to happen.\
 Carefully analyze the changes and understand what files in the project need to be changed.\
 The notes may contain details about changes already made. Please do not act on any of the changes already made. Assume they are correct and only focus on any additional changes needed.\
 You have access to a set of tools to search for files, read a file and write to a file.\
-Work on one file at a time. Completely address changes in one file before moving onto to next file.\
-Respond with DONE when you're done addressing all the changes or there are no additional changes.\
+Work on one file at a time. **Completely address changes in one file before moving onto to next file.**\
+Explain you rationale while you make changes to files.\
+When you're done addressing all the changes or there are no additional changes, briefly summarize changes you made.\
 `,
     );
 
