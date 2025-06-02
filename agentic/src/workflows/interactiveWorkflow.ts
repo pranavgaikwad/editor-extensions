@@ -304,8 +304,10 @@ export class KaiInteractiveWorkflow
 
     await this.followUpInteractiveWorkflow?.invoke(interactiveWorkflowInput, {
       // each state change is one iteration, keeping this really high
-      // users can ask to stop at any point
-      recursionLimit: 2000,
+      // users can ask to stop at any point. fixing analysis issues in a file
+      // followed by adding a dependency to the pom is roughly 10 iterations if
+      // the agent can find the pom file in the first attempt
+      recursionLimit: 3000,
     });
 
     return runResponse;

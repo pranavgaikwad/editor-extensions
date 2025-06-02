@@ -72,6 +72,17 @@ export class DiagnosticsIssueFix extends BaseNode {
     state: typeof DiagnosticsOrchestratorState.State,
   ): Promise<typeof DiagnosticsOrchestratorState.State> {
     const nextState: typeof DiagnosticsOrchestratorState.State = { ...state, shouldEnd: false };
+    // if there is already an agent we sent work to, process their outputs and reset state
+    if (state.currentAgent) {
+      switch (state.currentAgent as AgentName) {
+        case "generalFix":
+          nextState.inputInstructionsForGeneralFix = undefined;
+          nextState.messages = state.messages.map((m) => new RemoveMessage({ id: m.id! }));
+          break;
+      }
+      nextState.currentAgent = undefined;
+      nextState.currentTask = undefined;
+    }
     // when there is nothing to work on, wait for diagnostics information
     if (
       (!state.inputDiagnosticsTasks || !state.inputDiagnosticsTasks.length) &&
@@ -129,17 +140,6 @@ export class DiagnosticsIssueFix extends BaseNode {
         this.diagnosticsPromises.delete(id);
       }
       return nextState;
-    }
-    // if there is already an agent we sent work to, process their outputs and reset state
-    if (state.currentAgent) {
-      switch (state.currentAgent as AgentName) {
-        case "generalFix":
-          nextState.inputInstructionsForGeneralFix = undefined;
-          nextState.messages = state.messages.map((m) => new RemoveMessage({ id: m.id! }));
-          break;
-      }
-      nextState.currentAgent = undefined;
-      nextState.currentTask = undefined;
     }
     // if there are any tasks left that planner already gave us, finish that work first
     if (state.outputNominatedAgents && state.outputNominatedAgents.length) {
