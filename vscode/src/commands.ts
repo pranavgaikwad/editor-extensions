@@ -243,7 +243,7 @@ const commandsMap: (state: ExtensionState) => {
         // this is a number I am setting for demo purposes
         // until we have a full UI support. we will only
         // process child issues until the depth of 2
-        const maxTaskManagerIterations = 2;
+        const maxTaskManagerIterations = 1;
         let currentTaskManagerIterations = 0;
 
         // Process each file's incidents
@@ -305,7 +305,7 @@ const commandsMap: (state: ExtensionState) => {
                           messageToken: msg.id,
                           timestamp: new Date().toISOString(),
                           value: {
-                            message: `It appears that my fixes caused following issues:\n\n - ${tasks.map((t) => t.task).join("\n * ")}\n\nDo you want me to continue fixing them?`,
+                            message: `It appears that my fixes caused following issues:\n\n - ${[...new Set(tasks.map((t) => t.task))].join("\n * ")}\n\nDo you want me to continue fixing them?`,
                           },
                         });
                       });

@@ -32,6 +32,7 @@ export class DiagnosticsIssueFix extends BaseNode {
 
   static readonly SubAgents: { [key in AgentName]?: string } = {
     generalFix: "Fixes general issues, use when no other specialized agent is available",
+    javaDependency: "Adds, removes or updates dependencies in a pom.xml file",
   } as const;
 
   constructor(
@@ -49,6 +50,8 @@ export class DiagnosticsIssueFix extends BaseNode {
     this.planFixes = this.planFixes.bind(this);
     this.fixGeneralIssues = this.fixGeneralIssues.bind(this);
     this.parsePlannerResponse = this.parsePlannerResponse.bind(this);
+    this.fixJavaDependencyIssues = this.fixJavaDependencyIssues.bind(this);
+    this.resolveDiagnosticsPromise = this.resolveDiagnosticsPromise.bind(this);
     this.orchestratePlanAndExecution = this.orchestratePlanAndExecution.bind(this);
   }
 
@@ -76,6 +79,7 @@ export class DiagnosticsIssueFix extends BaseNode {
     if (state.currentAgent) {
       switch (state.currentAgent as AgentName) {
         case "generalFix":
+        case "javaDependency":
           nextState.inputInstructionsForGeneralFix = undefined;
           nextState.messages = state.messages.map((m) => new RemoveMessage({ id: m.id! }));
           break;
@@ -87,7 +91,7 @@ export class DiagnosticsIssueFix extends BaseNode {
     if (
       (!state.inputDiagnosticsTasks || !state.inputDiagnosticsTasks.length) &&
       !state.inputSummarizedAdditionalInfo &&
-      (!state.outputNominatedAgents || !state.outputNominatedAgents.length)
+      (!state.plannerOutputNominatedAgents || !state.plannerOutputNominatedAgents.length)
     ) {
       nextState.shouldEnd = true;
       // if diagnostic fixes is disabled, end here
@@ -142,12 +146,13 @@ export class DiagnosticsIssueFix extends BaseNode {
       return nextState;
     }
     // if there are any tasks left that planner already gave us, finish that work first
-    if (state.outputNominatedAgents && state.outputNominatedAgents.length) {
-      const nextSelection = state.outputNominatedAgents.pop();
+    if (state.plannerOutputNominatedAgents && state.plannerOutputNominatedAgents.length) {
+      const nextSelection = state.plannerOutputNominatedAgents.pop();
       if (nextSelection) {
         const { name, instructions } = nextSelection;
         switch (name as AgentName) {
           case "generalFix":
+          case "javaDependency":
             nextState.inputInstructionsForGeneralFix = instructions;
             nextState.inputUrisForGeneralFix =
               state.currentTask && state.currentTask.uri
@@ -160,7 +165,7 @@ export class DiagnosticsIssueFix extends BaseNode {
             break;
         }
       }
-      nextState.outputNominatedAgents = state.outputNominatedAgents || undefined;
+      nextState.plannerOutputNominatedAgents = state.plannerOutputNominatedAgents || undefined;
       return nextState;
     }
     // if we are here, there are tasks that need to be planned
@@ -192,7 +197,7 @@ export class DiagnosticsIssueFix extends BaseNode {
       !state.plannerInputTasks.tasks.length
     ) {
       return {
-        outputNominatedAgents: [],
+        plannerOutputNominatedAgents: [],
       };
     }
 
@@ -226,12 +231,13 @@ Make sure your instructions are specific to fixing issues in this file.`
 ${state.plannerInputBackground}
 
 Your primary task is to carefully analyze **each individual issue** in the list.\
-For each issue, you must determine the most suitable specialized agent to address it. You should group related issues that can be efficiently solved by the same agent, ensuring the **most specific agent** is chosen for the grouped issues. If an an issue, or a group of issues, requires a different specialist, you **must** create a new delegation block for that specialist.
-Your instructions to each agent must be specific, clear, and tailored to their expertise, detailing how they should approach and solve the assigned problems. Make sure your instructions take into account previous changes we made for migrating the project and align with the overall migration effort. Consider the nuances of each issue and match it precisely with the described capabilities of the agents.\
-If no specialized agent is a perfect fit for an issue or a group of issues, direct it to the generalist agent with comprehensive instructions.
-**Make sure** your instructions take into account previous changes we made for migrating the project. They should align with the overall migration effort.\
+For each issue, you must determine the most suitable specialized agent to address it.\
+You should group related issues that can be efficiently solved by the same agent, ensuring the **most specific agent** is chosen for the grouped issues.
+If an an issue, or a group of issues, requires a different specialist, you **must** create a new delegation block for that specialist.
+Your instructions to each agent must be specific, clear, and tailored to their expertise, detailing how they should approach and solve the assigned problems.\
+**Make sure** your instructions take into account previous changes we made for migrating the project and align with the overall migration effort.\
 Consider the nuances of each issue and match it precisely with the described capabilities of the agents.\
-If no specialized agent is a perfect fit, direct the issue to the generalist agent with comprehensive instructions.\
+If no specialized agent is a perfect fit for an issue or a group of issues, direct it to the generalist agent with comprehensive instructions.
 **Make sure all issues from the list are addressed.** You will likely need to delegate to more than one agent to address all issues effectively.
 
 Your response **must** consist of one or more distinct blocks, each delegating tasks to a specific agent. Each block **must** follow this exact format:
@@ -259,12 +265,12 @@ Instructions for Agent B to solve Issue 3, Issue 4, etc. (mention specific issue
 
     if (!response) {
       return {
-        outputNominatedAgents: [],
+        plannerOutputNominatedAgents: [],
       };
     }
 
     return {
-      outputNominatedAgents: this.parsePlannerResponse(response),
+      plannerOutputNominatedAgents: this.parsePlannerResponse(response),
     };
   }
 
@@ -299,6 +305,65 @@ ${
     : ``
 }`),
       );
+    }
+
+    const response = await this.streamOrInvoke(chat, {
+      toolsSelectors: [".*File.*"],
+    });
+
+    if (!response) {
+      return {
+        messages: [new AIMessage(`DONE`)],
+        outputModifiedFilesFromGeneralFix: [],
+      };
+    }
+
+    return {
+      messages: [response],
+      outputModifiedFilesFromGeneralFix: [],
+    };
+  }
+
+  // this is intentionally not generalized for all dependencies, only for pom.xml files
+  // TODO (pgaikwad) - generalize this when we move to other languages
+  // TODO (pgaikwad) - add gradle support
+  async fixJavaDependencyIssues(
+    state: typeof GeneralIssueFixInputState.State,
+  ): Promise<typeof GeneralIssueFixOutputState.State> {
+    const sys_message = new SystemMessage(
+      `You are an expert Java developer specializing in dependency management and migrating source code from / to ${state.migrationHint}.`,
+    );
+
+    const human_message = new HumanMessage(`
+Your task is to resolve compilation or runtime errors in a Java project by identifying and adding missing dependencies to the project's pom.xml file.
+
+**Your Goal:**
+Successfully add necessary dependencies or modify existing dependencies to resolve identified issues, ensuring the project compiles and runs correctly.
+
+**Information Provided:**
+You will be given information about the issues found, which may include compilation errors, stack traces from runtime errors, or descriptions of missing classes/methods.\
+Determine whether the given issue can be fixed by adding, modifying, updating or deleting one or more dependency.\
+You have access to a set of tools to search for files, read a file and write to a file.\
+You also have access to specific tools that will help you determine which dependency to add.\
+Explain you rationale while you make changes to files.\
+If the given issue cannot be solved by adding, modifying, updating or deleting dependencies, do not take any action.\
+Explain your rationale as you make changes.\
+
+${
+  state.inputUrisForGeneralFix && state.inputUrisForGeneralFix.length > 0
+    ? `* Files in which these issues were found:\n${state.inputUrisForGeneralFix.join("\n")}`
+    : ``
+}
+
+Here are the issues:\
+${state.inputInstructionsForGeneralFix}
+`);
+
+    const chat: BaseMessage[] = state.messages ?? [];
+
+    if (chat.length === 0) {
+      chat.push(sys_message);
+      chat.push(human_message);
     }
 
     const response = await this.streamOrInvoke(chat);

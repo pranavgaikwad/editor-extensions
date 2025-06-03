@@ -4,7 +4,7 @@ import { BaseInputMetaState } from "./base";
 import { type KaiModifiedFile } from "../types";
 
 // different types of agents available
-export type AgentName = "generalFix" | "dependency" | "properties";
+export type AgentName = "generalFix" | "javaDependency" | "properties";
 
 // input state for node that plans the fixes for given diagnostics issues
 export const DiagnosticsPlannerInputState = Annotation.Root({
@@ -20,7 +20,7 @@ export const DiagnosticsPlannerInputState = Annotation.Root({
 // output state for the planner node
 export const DiagnosticsPlannerOutputState = Annotation.Root({
   // list of agents and detailed instructions for them to work issues
-  outputNominatedAgents: Annotation<
+  plannerOutputNominatedAgents: Annotation<
     | Array<{
         name: string;
         instructions: string;

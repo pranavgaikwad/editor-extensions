@@ -37,13 +37,15 @@ export abstract class BaseNode extends KaiWorkflowEventEmitter {
     this.tools = tools;
 
     // binding this is needed to work inside langgraph
+    this.stream = this.stream.bind(this);
+    this.runTools = this.runTools.bind(this);
     this.newMessageId = this.newMessageId.bind(this);
     this.streamOrInvoke = this.streamOrInvoke.bind(this);
-    this.stream = this.stream.bind(this);
     this.getRunnableWithTools = this.getRunnableWithTools.bind(this);
+    this.aiMessageToString = this.aiMessageToString.bind(this);
     this.getToolsAsMessage = this.getToolsAsMessage.bind(this);
+    this.getToolsMatchingSelectors = this.getToolsMatchingSelectors.bind(this);
     this.renderTextDescriptionAndArgs = this.renderTextDescriptionAndArgs.bind(this);
-    this.runTools = this.runTools.bind(this);
   }
 
   private newMessageId(prefix: string = "res"): string {
@@ -448,7 +450,7 @@ Make sure you always use \`\`\` at the start and end of the JSON block to clearl
       return this.tools;
     }
     return this.tools.filter((tool) => {
-      selectors.some((selector) => {
+      return selectors.some((selector) => {
         if (selector === tool.name) {
           return true;
         }

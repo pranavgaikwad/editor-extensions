@@ -22,6 +22,7 @@ import { modelHealthCheck } from "../utils";
 import { FileSystemTools } from "../tools/filesystem";
 import { KaiWorkflowEventEmitter } from "../eventEmitter";
 import { AnalysisIssueFix } from "../nodes/analysisIssueFix";
+import { JavaDependencyTools } from "../tools/javaDependency";
 import { DiagnosticsIssueFix } from "../nodes/diagnosticsIssueFix";
 import { AgentName, DiagnosticsOrchestratorState } from "../schemas/diagnosticsIssueFix";
 
@@ -85,14 +86,15 @@ export class KaiInteractiveWorkflow
     this.followUpInteractiveWorkflow = undefined;
     this.userInteractionPromises = new Map<string, PendingUserInteraction>();
 
-    this.runToolsGeneralFixIssues = this.runToolsGeneralFixIssues.bind(this);
-    this.diagnosticsOrchestratorEdge = this.diagnosticsOrchestratorEdge.bind(this);
+    this.runToolsEdgeFunction = this.runToolsEdgeFunction.bind(this);
     this.analysisIssueFixRouterEdge = this.analysisIssueFixRouterEdge.bind(this);
+    this.diagnosticsOrchestratorEdge = this.diagnosticsOrchestratorEdge.bind(this);
   }
 
   async init(options: KaiWorkflowInitOptions): Promise<void> {
     const workspaceDir = options.workspaceDir.replace("file://", "");
     const fsTools = new FileSystemTools(workspaceDir, options.fsCache);
+    const depTools = new JavaDependencyTools();
     const { supportsTools, connected, supportsToolsInStreaming } = await modelHealthCheck(
       options.model,
     );
@@ -107,6 +109,7 @@ export class KaiInteractiveWorkflow
       },
       fsTools.all(),
       options.fsCache,
+      workspaceDir,
     );
     // relay events from nodes back to callers
     analysisIssueFixNodes.on("workflowMessage", async (msg: KaiWorkflowMessage) => {
@@ -124,7 +127,7 @@ export class KaiInteractiveWorkflow
       },
       workspaceDir,
       fsTools.all(),
-      [],
+      depTools.all(),
       options.fsCache,
     );
     this.diagnosticsNodes.on("workflowMessage", async (msg: KaiWorkflowMessage) => {
@@ -170,18 +173,33 @@ export class KaiInteractiveWorkflow
     })
       // node that orchestrates planning and invoking of other agents
       .addNode("orchestrate_plan_and_execution", this.diagnosticsNodes.orchestratePlanAndExecution)
+      // node that plans fixes and distributes work to specialized agents
       .addNode("plan_fixes", this.diagnosticsNodes.planFixes)
+      // node that is responsible for fixing issues that don't have a specialized agent available for
       .addNode("fix_general_issues", this.diagnosticsNodes.fixGeneralIssues)
+      // node responsible for fixing dependency issues
+      .addNode("fix_dep_issues", this.diagnosticsNodes.fixJavaDependencyIssues)
+      // node responsible for handling tool calls by the general agent
       .addNode("tools_fix_general_issues", this.diagnosticsNodes.runTools)
+      // node responsible for handling tool calls by the dep agent
+      .addNode("tools_fix_dep_issues", this.diagnosticsNodes.runTools)
       .addEdge("tools_fix_general_issues", "fix_general_issues")
+      .addEdge("tools_fix_dep_issues", "fix_dep_issues")
       .addEdge("plan_fixes", "orchestrate_plan_and_execution")
       .addEdge(START, "orchestrate_plan_and_execution")
-      .addConditionalEdges("fix_general_issues", this.runToolsGeneralFixIssues, [
-        "tools_fix_general_issues",
-        "orchestrate_plan_and_execution",
-      ])
+      .addConditionalEdges(
+        "fix_general_issues",
+        this.runToolsEdgeFunction("tools_fix_general_issues", "orchestrate_plan_and_execution"),
+        ["tools_fix_general_issues", "orchestrate_plan_and_execution"],
+      )
+      .addConditionalEdges(
+        "fix_dep_issues",
+        this.runToolsEdgeFunction("tools_fix_dep_issues", "orchestrate_plan_and_execution"),
+        ["tools_fix_dep_issues", "orchestrate_plan_and_execution"],
+      )
       .addConditionalEdges("orchestrate_plan_and_execution", this.diagnosticsOrchestratorEdge, [
         "plan_fixes",
+        "fix_dep_issues",
         "fix_general_issues",
         "orchestrate_plan_and_execution",
         END,
@@ -219,13 +237,14 @@ export class KaiInteractiveWorkflow
       currentIdx: 0,
       migrationHint: input.migrationHint,
       programmingLanguage: input.programmingLanguage,
+      enableAdditionalInformation: input.enableAdditionalInformation ?? false,
       // internal fields
       inputFileContent: undefined,
       inputFileUri: undefined,
       inputIncidentsDescription: undefined,
       inputAllAdditionalInfo: undefined,
-      inputAllFileUris: undefined,
       inputAllReasoning: undefined,
+      inputAllModifiedFiles: [],
       outputAdditionalInfo: undefined,
       outputReasoning: undefined,
       outputUpdatedFile: undefined,
@@ -246,7 +265,11 @@ export class KaiInteractiveWorkflow
 
     // if there is any additional information spit by analysis workflow, capture that
     const additionalInformation: string = analysisFixOutputState.summarizedAdditionalInfo;
-    if (additionalInformation.length < 1 || additionalInformation.includes("NO-CHANGE")) {
+    if (
+      !input.enableAdditionalInformation ||
+      additionalInformation.length < 1 ||
+      additionalInformation.includes("NO-CHANGE")
+    ) {
       return runResponse;
     } else {
       // wait for user confirmation
@@ -286,7 +309,7 @@ export class KaiInteractiveWorkflow
         (input.enableAdditionalInformation ?? false) ? additionalInformation : undefined,
       migrationHint: input.migrationHint,
       programmingLanguage: input.programmingLanguage,
-      plannerInputAgents: ["generalFix"],
+      plannerInputAgents: ["generalFix", "javaDependency"],
       plannerInputBackground: analysisFixOutputState.summarizedHistory,
       enableDiagnosticsFixes: input.enableDiagnostics ?? false,
       // internal fields
@@ -297,7 +320,7 @@ export class KaiInteractiveWorkflow
       inputUrisForGeneralFix: undefined,
       messages: [],
       outputModifiedFilesFromGeneralFix: undefined,
-      outputNominatedAgents: undefined,
+      plannerOutputNominatedAgents: undefined,
       plannerInputTasks: undefined,
       shouldEnd: false,
     };
@@ -355,10 +378,12 @@ export class KaiInteractiveWorkflow
       return "fix_analysis_issue_router";
     }
     // if the router accumulated all responses, we need to go to additional information
-    if (state.inputAllAdditionalInfo && state.inputAllReasoning) {
-      return ["summarize_additional_information", "summarize_history"];
-    } else if (state.inputAllAdditionalInfo) {
-      return "summarize_additional_information";
+    if (state.enableAdditionalInformation) {
+      if (state.inputAllAdditionalInfo && state.inputAllReasoning) {
+        return ["summarize_additional_information", "summarize_history"];
+      } else if (state.inputAllAdditionalInfo) {
+        return "summarize_additional_information";
+      }
     }
     return "END";
   }
@@ -375,6 +400,8 @@ export class KaiInteractiveWorkflow
       switch (state.currentAgent as AgentName) {
         case "generalFix":
           return "fix_general_issues";
+        case "javaDependency":
+          return "fix_dep_issues";
         default:
           return "orchestrate_plan_and_execution";
       }
@@ -386,18 +413,52 @@ export class KaiInteractiveWorkflow
     return "orchestrate_plan_and_execution";
   }
 
-  // edge to process tool calls for general issue fix node
-  private async runToolsGeneralFixIssues(state: typeof MessagesAnnotation.State): Promise<string> {
-    if (!state.messages) {
-      return "orchestrate_plan_and_execution";
-    }
-    const lastMessage = state.messages[state.messages.length - 1];
-    if (lastMessage instanceof AIMessage || lastMessage instanceof AIMessageChunk) {
-      return lastMessage.tool_calls && lastMessage.tool_calls.length > 0
-        ? "tools_fix_general_issues"
-        : "orchestrate_plan_and_execution";
-    } else {
-      return "orchestrate_plan_and_execution";
-    }
+  // generates an edge function to connect agent nodes with tool nodes and their orchestrator nodes
+  // returnNode is the orchestrator
+  private runToolsEdgeFunction(
+    toolNode: string,
+    returnNode: string,
+  ): (state: typeof MessagesAnnotation.State) => Promise<string> {
+    return async (state: typeof MessagesAnnotation.State): Promise<string> => {
+      if (!state.messages) {
+        return returnNode;
+      }
+      const lastMessage = state.messages[state.messages.length - 1];
+      if (lastMessage instanceof AIMessage || lastMessage instanceof AIMessageChunk) {
+        return lastMessage.tool_calls && lastMessage.tool_calls.length > 0 ? toolNode : returnNode;
+      } else {
+        return returnNode;
+      }
+    };
   }
+
+  // // edge to process tool calls for general issue fix node
+  // private async runToolsFixGeneralIssues(state: typeof MessagesAnnotation.State): Promise<string> {
+  //   if (!state.messages) {
+  //     return "orchestrate_plan_and_execution";
+  //   }
+  //   const lastMessage = state.messages[state.messages.length - 1];
+  //   if (lastMessage instanceof AIMessage || lastMessage instanceof AIMessageChunk) {
+  //     return lastMessage.tool_calls && lastMessage.tool_calls.length > 0
+  //       ? "tools_fix_general_issues"
+  //       : "orchestrate_plan_and_execution";
+  //   } else {
+  //     return "orchestrate_plan_and_execution";
+  //   }
+  // }
+
+  // // edge responsible to process tool calls by dep agent
+  // private async runToolsFixDepIssues(state: typeof MessagesAnnotation.State): Promise<string> {
+  //   if (!state.messages) {
+  //     return "orchestrate_plan_and_execution";
+  //   }
+  //   const lastMessage = state.messages[state.messages.length - 1];
+  //   if (lastMessage instanceof AIMessage || lastMessage instanceof AIMessageChunk) {
+  //     return lastMessage.tool_calls && lastMessage.tool_calls.length > 0
+  //       ? "tools_fix_dep_issues"
+  //       : "orchestrate_plan_and_execution";
+  //   } else {
+  //     return "orchestrate_plan_and_execution";
+  //   }
+  // }
 }

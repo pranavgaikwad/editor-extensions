@@ -34,7 +34,7 @@ export const SummarizeAdditionalInfoInputState = Annotation.Root({
   // the additional info
   inputAllAdditionalInfo: Annotation<string | undefined>,
   inputAllReasoning: Annotation<string | undefined>,
-  inputAllFileUris: Annotation<Array<string> | undefined>,
+  inputAllModifiedFiles: Annotation<Array<string>>,
 });
 
 // orchestrator state for the analysis issue fix sub-flow.
@@ -55,6 +55,7 @@ export const AnalysisIssueFixOrchestratorState = Annotation.Root({
   inputIncidentsByUris: Annotation<Array<{ uri: string; incidents: Array<EnhancedIncident> }>>,
   // keeps track of which file we are working on for analysis fixes
   currentIdx: Annotation<number>,
+  enableAdditionalInformation: Annotation<boolean>,
 });
 
 // output state for node that summarizes additional information

@@ -1,4 +1,4 @@
-import { basename } from "path";
+import { basename, relative } from "path";
 import {
   type AIMessage,
   type AIMessageChunk,
@@ -27,9 +27,11 @@ export class AnalysisIssueFix extends BaseNode {
     modelInfo: ModelInfo,
     tools: DynamicStructuredTool[],
     private readonly fsCache: KaiFsCache,
+    private readonly workspaceDir: string,
   ) {
     super("AnalysisIssueFix", modelInfo, tools);
     this.fsCache = fsCache;
+    this.workspaceDir = workspaceDir;
 
     this.fixAnalysisIssue = this.fixAnalysisIssue.bind(this);
     this.summarizeHistory = this.summarizeHistory.bind(this);
@@ -105,15 +107,18 @@ export class AnalysisIssueFix extends BaseNode {
           return {
             reasoning: `${acc.reasoning}\n${val.outputReasoning}`,
             additionalInfo: `${acc.additionalInfo}\n${val.outputAdditionalInfo}`,
+            uris: acc.uris.concat([relative(this.workspaceDir, val.outputUpdatedFileUri!)]),
           };
         },
         {
           reasoning: "",
           additionalInfo: "",
-        } as { reasoning: string; additionalInfo: string },
+          uris: [],
+        } as { reasoning: string; additionalInfo: string; uris: string[] },
       );
       nextState.inputAllAdditionalInfo = accumulated.additionalInfo;
       nextState.inputAllReasoning = accumulated.reasoning;
+      nextState.inputAllModifiedFiles = accumulated.uris;
     }
     return nextState;
   }
@@ -230,8 +235,11 @@ ${
 }
 ### Additional information about changes
 ${state.inputAllAdditionalInfo}
-### List of modified files
-${state.inputAllFileUris?.join("\n")}
+${
+  state.inputAllModifiedFiles
+    ? `### List of modified files\n${state.inputAllModifiedFiles?.join("\n")}`
+    : ""
+}
 `,
     );
 
