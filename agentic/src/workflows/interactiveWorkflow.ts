@@ -431,34 +431,4 @@ export class KaiInteractiveWorkflow
       }
     };
   }
-
-  // // edge to process tool calls for general issue fix node
-  // private async runToolsFixGeneralIssues(state: typeof MessagesAnnotation.State): Promise<string> {
-  //   if (!state.messages) {
-  //     return "orchestrate_plan_and_execution";
-  //   }
-  //   const lastMessage = state.messages[state.messages.length - 1];
-  //   if (lastMessage instanceof AIMessage || lastMessage instanceof AIMessageChunk) {
-  //     return lastMessage.tool_calls && lastMessage.tool_calls.length > 0
-  //       ? "tools_fix_general_issues"
-  //       : "orchestrate_plan_and_execution";
-  //   } else {
-  //     return "orchestrate_plan_and_execution";
-  //   }
-  // }
-
-  // // edge responsible to process tool calls by dep agent
-  // private async runToolsFixDepIssues(state: typeof MessagesAnnotation.State): Promise<string> {
-  //   if (!state.messages) {
-  //     return "orchestrate_plan_and_execution";
-  //   }
-  //   const lastMessage = state.messages[state.messages.length - 1];
-  //   if (lastMessage instanceof AIMessage || lastMessage instanceof AIMessageChunk) {
-  //     return lastMessage.tool_calls && lastMessage.tool_calls.length > 0
-  //       ? "tools_fix_dep_issues"
-  //       : "orchestrate_plan_and_execution";
-  //   } else {
-  //     return "orchestrate_plan_and_execution";
-  //   }
-  // }
 }
