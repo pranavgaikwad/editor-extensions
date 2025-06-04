@@ -178,13 +178,13 @@ export class KaiInteractiveWorkflow
       // node that is responsible for fixing issues that don't have a specialized agent available for
       .addNode("fix_general_issues", this.diagnosticsNodes.fixGeneralIssues)
       // node responsible for fixing dependency issues
-      .addNode("fix_dep_issues", this.diagnosticsNodes.fixJavaDependencyIssues)
+      .addNode("fix_java_dep_issues", this.diagnosticsNodes.fixJavaDependencyIssues)
       // node responsible for handling tool calls by the general agent
       .addNode("tools_fix_general_issues", this.diagnosticsNodes.runTools)
       // node responsible for handling tool calls by the dep agent
       .addNode("tools_fix_dep_issues", this.diagnosticsNodes.runTools)
       .addEdge("tools_fix_general_issues", "fix_general_issues")
-      .addEdge("tools_fix_dep_issues", "fix_dep_issues")
+      .addEdge("tools_fix_dep_issues", "fix_java_dep_issues")
       .addEdge("plan_fixes", "orchestrate_plan_and_execution")
       .addEdge(START, "orchestrate_plan_and_execution")
       .addConditionalEdges(
@@ -193,13 +193,13 @@ export class KaiInteractiveWorkflow
         ["tools_fix_general_issues", "orchestrate_plan_and_execution"],
       )
       .addConditionalEdges(
-        "fix_dep_issues",
+        "fix_java_dep_issues",
         this.runToolsEdgeFunction("tools_fix_dep_issues", "orchestrate_plan_and_execution"),
         ["tools_fix_dep_issues", "orchestrate_plan_and_execution"],
       )
       .addConditionalEdges("orchestrate_plan_and_execution", this.diagnosticsOrchestratorEdge, [
         "plan_fixes",
-        "fix_dep_issues",
+        "fix_java_dep_issues",
         "fix_general_issues",
         "orchestrate_plan_and_execution",
         END,
@@ -401,7 +401,7 @@ export class KaiInteractiveWorkflow
         case "generalFix":
           return "fix_general_issues";
         case "javaDependency":
-          return "fix_dep_issues";
+          return "fix_java_dep_issues";
         default:
           return "orchestrate_plan_and_execution";
       }
