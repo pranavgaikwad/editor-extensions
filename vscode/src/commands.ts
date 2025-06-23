@@ -63,12 +63,7 @@ import {
   getBuildFilesForLanguage,
 } from "./utilities/fileUtils";
 import { handleConfigureCustomRules } from "./utilities/profiles/profileActions";
-import { ChatOpenAI, AzureChatOpenAI } from "@langchain/openai";
-import { ChatBedrockConverse, type ChatBedrockConverseInput } from "@langchain/aws";
-import { ChatGoogleGenerativeAI } from "@langchain/google-genai";
-import { ChatDeepSeek } from "@langchain/deepseek";
-import { ChatOllama } from "@langchain/ollama";
-import { getModelConfig } from "./client/modelProvider";
+import { getModelConfig, ModelProvider } from "./client/modelProvider";
 import { createPatch, createTwoFilesPatch } from "diff";
 
 const isWindows = process.platform === "win32";
@@ -143,86 +138,13 @@ const commandsMap: (state: ExtensionState) => {
 
       try {
         // Get the model provider configuration from settings YAML
-        const modelProvider = await getModelConfig(paths().settingsYaml);
-        if (!modelProvider) {
+        const modelConfig = await getModelConfig(paths().settingsYaml);
+        if (!modelConfig) {
           throw new Error("Model provider configuration not found in settings YAML.");
         }
 
-        // Initialize the appropriate model based on the provider
-        let model;
-        const providerType = modelProvider.config.provider;
-
-        switch (providerType) {
-          case "ChatOpenAI":
-            model = new ChatOpenAI({
-              openAIApiKey: modelProvider.env.OPENAI_API_KEY,
-              modelName: modelProvider.config.args["model"],
-              streaming: true,
-              temperature: modelProvider.config.args["temperature"] || 0.1,
-              maxTokens: modelProvider.config.args["max_tokens"],
-            });
-            break;
-
-          case "AzureChatOpenAI":
-            model = new AzureChatOpenAI({
-              openAIApiKey: modelProvider.env.OPENAI_API_KEY,
-              deploymentName: modelProvider.config.args["azure_deployment"],
-              openAIApiVersion: modelProvider.config.args["api_version"],
-              streaming: true,
-              temperature: modelProvider.config.args["temperature"] || 0.1,
-              maxTokens: modelProvider.config.args["max_tokens"],
-            });
-            break;
-
-          case "ChatBedrock": {
-            const config: ChatBedrockConverseInput = {
-              model: modelProvider.config.args["model_id"],
-              region: modelProvider.env.AWS_DEFAULT_REGION,
-              streaming: true,
-              temperature: modelProvider.config.args["temperature"],
-              maxTokens: modelProvider.config.args["max_tokens"],
-            };
-            // aws credentials can be specified globally using a credentials file
-            if (modelProvider.env.AWS_ACCESS_KEY_ID && modelProvider.env.AWS_SECRET_ACCESS_KEY) {
-              config.credentials = {
-                accessKeyId: modelProvider.env.AWS_ACCESS_KEY_ID,
-                secretAccessKey: modelProvider.env.AWS_SECRET_ACCESS_KEY,
-              };
-            }
-            model = new ChatBedrockConverse(config);
-            break;
-          }
-          case "ChatGoogleGenerativeAI":
-            model = new ChatGoogleGenerativeAI({
-              model: modelProvider.config.args["model_id"],
-              streaming: true,
-              temperature: modelProvider.config.args["temperature"] || 0.7,
-              maxOutputTokens: modelProvider.config.args["max_tokens"],
-            });
-            break;
-
-          case "ChatDeepSeek":
-            model = new ChatDeepSeek({
-              modelName: modelProvider.config.args["model"],
-              streaming: true,
-              temperature: modelProvider.config.args["temperature"] || 0,
-              maxTokens: modelProvider.config.args["max_tokens"],
-            });
-            break;
-
-          case "ChatOllama":
-            model = new ChatOllama({
-              baseUrl: modelProvider.config.args["base_url"],
-              model: modelProvider.config.args["model"],
-              streaming: true,
-              temperature: modelProvider.config.args["temperature"] || 0.1,
-              numPredict: modelProvider.config.args["max_tokens"],
-            });
-            break;
-
-          default:
-            throw new Error(`Unsupported model provider: ${providerType}`);
-        }
+        // Initialize the appropriate model based on the config
+        const model = ModelProvider.fromConfig(modelConfig);
 
         // Get the profile name from the incidents
         const profileName = incidents[0]?.activeProfileName;
