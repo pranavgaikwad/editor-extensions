@@ -68,7 +68,7 @@ import { ChatBedrockConverse, type ChatBedrockConverseInput } from "@langchain/a
 import { ChatGoogleGenerativeAI } from "@langchain/google-genai";
 import { ChatDeepSeek } from "@langchain/deepseek";
 import { ChatOllama } from "@langchain/ollama";
-import { getModelProvider } from "./client/modelProvider";
+import { getModelConfig } from "./client/modelProvider";
 import { createPatch, createTwoFilesPatch } from "diff";
 
 const isWindows = process.platform === "win32";
@@ -143,44 +143,44 @@ const commandsMap: (state: ExtensionState) => {
 
       try {
         // Get the model provider configuration from settings YAML
-        const modelProvider = await getModelProvider(paths().settingsYaml);
+        const modelProvider = await getModelConfig(paths().settingsYaml);
         if (!modelProvider) {
           throw new Error("Model provider configuration not found in settings YAML.");
         }
 
         // Initialize the appropriate model based on the provider
         let model;
-        const providerType = modelProvider.modelProvider.provider;
+        const providerType = modelProvider.config.provider;
 
         switch (providerType) {
           case "ChatOpenAI":
             model = new ChatOpenAI({
               openAIApiKey: modelProvider.env.OPENAI_API_KEY,
-              modelName: modelProvider.modelProvider.args["model"],
+              modelName: modelProvider.config.args["model"],
               streaming: true,
-              temperature: modelProvider.modelProvider.args["temperature"] || 0.1,
-              maxTokens: modelProvider.modelProvider.args["max_tokens"],
+              temperature: modelProvider.config.args["temperature"] || 0.1,
+              maxTokens: modelProvider.config.args["max_tokens"],
             });
             break;
 
           case "AzureChatOpenAI":
             model = new AzureChatOpenAI({
               openAIApiKey: modelProvider.env.OPENAI_API_KEY,
-              deploymentName: modelProvider.modelProvider.args["azure_deployment"],
-              openAIApiVersion: modelProvider.modelProvider.args["api_version"],
+              deploymentName: modelProvider.config.args["azure_deployment"],
+              openAIApiVersion: modelProvider.config.args["api_version"],
               streaming: true,
-              temperature: modelProvider.modelProvider.args["temperature"] || 0.1,
-              maxTokens: modelProvider.modelProvider.args["max_tokens"],
+              temperature: modelProvider.config.args["temperature"] || 0.1,
+              maxTokens: modelProvider.config.args["max_tokens"],
             });
             break;
 
           case "ChatBedrock": {
             const config: ChatBedrockConverseInput = {
-              model: modelProvider.modelProvider.args["model_id"],
+              model: modelProvider.config.args["model_id"],
               region: modelProvider.env.AWS_DEFAULT_REGION,
               streaming: true,
-              temperature: modelProvider.modelProvider.args["temperature"],
-              maxTokens: modelProvider.modelProvider.args["max_tokens"],
+              temperature: modelProvider.config.args["temperature"],
+              maxTokens: modelProvider.config.args["max_tokens"],
             };
             // aws credentials can be specified globally using a credentials file
             if (modelProvider.env.AWS_ACCESS_KEY_ID && modelProvider.env.AWS_SECRET_ACCESS_KEY) {
@@ -194,29 +194,29 @@ const commandsMap: (state: ExtensionState) => {
           }
           case "ChatGoogleGenerativeAI":
             model = new ChatGoogleGenerativeAI({
-              model: modelProvider.modelProvider.args["model_id"],
+              model: modelProvider.config.args["model_id"],
               streaming: true,
-              temperature: modelProvider.modelProvider.args["temperature"] || 0.7,
-              maxOutputTokens: modelProvider.modelProvider.args["max_tokens"],
+              temperature: modelProvider.config.args["temperature"] || 0.7,
+              maxOutputTokens: modelProvider.config.args["max_tokens"],
             });
             break;
 
           case "ChatDeepSeek":
             model = new ChatDeepSeek({
-              modelName: modelProvider.modelProvider.args["model"],
+              modelName: modelProvider.config.args["model"],
               streaming: true,
-              temperature: modelProvider.modelProvider.args["temperature"] || 0,
-              maxTokens: modelProvider.modelProvider.args["max_tokens"],
+              temperature: modelProvider.config.args["temperature"] || 0,
+              maxTokens: modelProvider.config.args["max_tokens"],
             });
             break;
 
           case "ChatOllama":
             model = new ChatOllama({
-              baseUrl: modelProvider.modelProvider.args["base_url"],
-              model: modelProvider.modelProvider.args["model"],
+              baseUrl: modelProvider.config.args["base_url"],
+              model: modelProvider.config.args["model"],
               streaming: true,
-              temperature: modelProvider.modelProvider.args["temperature"] || 0.1,
-              numPredict: modelProvider.modelProvider.args["max_tokens"],
+              temperature: modelProvider.config.args["temperature"] || 0.1,
+              numPredict: modelProvider.config.args["max_tokens"],
             });
             break;
 
