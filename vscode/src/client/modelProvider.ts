@@ -118,8 +118,9 @@ class ChatBedrockCreator implements ModelCreator {
 }
 
 class ChatDeepSeekCreator implements ModelCreator {
-  create(args: Record<string, any>, _: Record<string, string>): BaseChatModel {
+  create(args: Record<string, any>, env: Record<string, string>): BaseChatModel {
     return new ChatDeepSeek({
+      apiKey: env.DEEPSEEK_API_KEY,
       ...args,
     });
   }
@@ -140,8 +141,9 @@ class ChatDeepSeekCreator implements ModelCreator {
 }
 
 class ChatGoogleGenerativeAICreator implements ModelCreator {
-  create(args: Record<string, any>, _: Record<string, string>): BaseChatModel {
+  create(args: Record<string, any>, env: Record<string, string>): BaseChatModel {
     return new ChatGoogleGenerativeAI({
+      apiKey: env.GOOGLE_API_KEY,
       ...args,
     } as GoogleGenerativeAIChatInput);
   }

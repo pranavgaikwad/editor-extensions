@@ -28,7 +28,7 @@ models:
 
   AzureChatOpenAI:
     environment:
-      OPENAI_API_KEY: "" # Required
+      AZURE_OPENAI_API_KEY: "" # Required
     provider: AzureChatOpenAI
     args:
       azureOpenAIApiDeploymentName: "" # Required
