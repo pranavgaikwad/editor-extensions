@@ -385,7 +385,7 @@ export class KaiInteractiveWorkflow
         return "summarize_additional_information";
       }
     }
-    return "END";
+    return END;
   }
 
   // edge for the orchestrator to delegate work to planner and sub-agents
