@@ -70,7 +70,9 @@ export async function modelHealthCheck(
         await model.invoke("a");
         response.connected = true;
       } catch (err) {
-        console.log(`Failed to run model health check - ${err}`);
+        throw new Error(
+          `Failed to run model healthcheck - ${err instanceof Error ? (err.message ?? String(err)) : String(err)}`,
+        );
       }
     }
     return response;

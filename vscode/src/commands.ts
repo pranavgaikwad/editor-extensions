@@ -296,7 +296,9 @@ const commandsMap: (state: ExtensionState) => {
         } catch (err) {
           console.error(`Error in running the agent - ${err}`);
           console.info(`Error trace - `, err instanceof Error ? err.stack : "N/A");
-          window.showInformationMessage(`We encountered an error running the agent.`);
+          window.showErrorMessage(
+            `We encountered an error running the agent - ${err instanceof Error ? err.message : String(err)}`,
+          );
         }
 
         // wait for modified files to process
