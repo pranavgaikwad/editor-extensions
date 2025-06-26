@@ -297,7 +297,7 @@ const commandsMap: (state: ExtensionState) => {
           console.error(`Error in running the agent - ${err}`);
           console.info(`Error trace - `, err instanceof Error ? err.stack : "N/A");
           window.showErrorMessage(
-            `We encountered an error running the agent - ${err instanceof Error ? err.message : String(err)}`,
+            `We encountered an error running the agent - ${err instanceof Error ? err.message || String(err) : String(err)}`,
           );
         }
 

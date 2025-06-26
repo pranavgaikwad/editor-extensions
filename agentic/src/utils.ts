@@ -71,7 +71,7 @@ export async function modelHealthCheck(
         response.connected = true;
       } catch (err) {
         throw new Error(
-          `Failed to run model healthcheck - ${err instanceof Error ? (err.message ?? String(err)) : String(err)}`,
+          `Failed to run model healthcheck - ${err instanceof Error ? err.message || String(err) : String(err)}`,
         );
       }
     }
