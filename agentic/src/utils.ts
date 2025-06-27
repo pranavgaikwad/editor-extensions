@@ -86,12 +86,8 @@ export async function modelHealthCheck(
  * @param path input path to clean
  */
 export function fileUriToPath(path: string): string {
-  let cleanPath = path;
-  if (path.startsWith("file://")) {
-    cleanPath = fileURLToPath(path);
-  }
-  if (process.platform === "win32" && path.startsWith("/")) {
-    cleanPath = cleanPath.replace("/", "");
-  }
-  return cleanPath;
+  const cleanPath = path.startsWith("file://") ? fileURLToPath(path) : path;
+  return process.platform === "win32" && cleanPath.startsWith("/")
+    ? cleanPath.replace("/", "")
+    : cleanPath;
 }
