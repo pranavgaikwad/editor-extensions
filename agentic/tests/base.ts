@@ -3,7 +3,11 @@ import { FakeStreamingChatModel } from "@langchain/core/utils/testing";
 import { type BaseLLMParams } from "@langchain/core/language_models/llms";
 import { type BaseLanguageModelInput } from "@langchain/core/language_models/base";
 import { AIMessageChunk, type AIMessage, type BaseMessage } from "@langchain/core/messages";
-import { type BaseChatModelCallOptions } from "@langchain/core/language_models/chat_models";
+import {
+  type BindToolsInput,
+  type BaseChatModelCallOptions,
+} from "@langchain/core/language_models/chat_models";
+import { Runnable } from "@langchain/core/runnables";
 
 export class FakeChatModelWithToolCalls extends FakeStreamingChatModel {
   private ai_responses: AIMessage[];
@@ -22,6 +26,13 @@ export class FakeChatModelWithToolCalls extends FakeStreamingChatModel {
     }
     super(fields);
     this.ai_responses = fields.responses!;
+  }
+
+  bindTools(
+    tools: BindToolsInput[],
+    kwargs?: Partial<BaseChatModelCallOptions> | undefined,
+  ): Runnable<BaseLanguageModelInput, AIMessageChunk, BaseChatModelCallOptions> {
+    return this;
   }
 
   async invoke(
