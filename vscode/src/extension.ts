@@ -15,6 +15,7 @@ import { IssuesModel, registerIssueView } from "./issueView";
 import { ExtensionPaths, ensurePaths, paths } from "./paths";
 import { copySampleProviderSettings } from "./utilities/fileUtils";
 import {
+  getExcludedDiagnosticSources,
   getConfigSolutionMaxEffortLevel,
   getConfigSolutionServerEnabled,
   getConfigSolutionServerUrl,
@@ -76,7 +77,7 @@ class VsCodeExtension {
       return data;
     };
 
-    const taskManager = new DiagnosticTaskManager();
+    const taskManager = new DiagnosticTaskManager(getExcludedDiagnosticSources());
 
     this.state = {
       analyzerClient: new AnalyzerClient(context, mutateData, getData, taskManager),

@@ -523,6 +523,15 @@
           "scope": "window",
           "order": 6
         },
+        "konveyor.kai.excludedDiagnosticSources": {
+          "type": "array",
+          "default": [
+            "trunk"
+          ],
+          "description": "List of diagnostic sources to exclude from agentic workflow.",
+          "scope": "window",
+          "order": 8
+        },
         "konveyor.kai.getSolutionMaxPriority": {
           "type": [
             "number",

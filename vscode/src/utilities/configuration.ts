@@ -73,6 +73,8 @@ export const getConfigMaxLLMQueries = (): number | undefined =>
 export const getConfigAgentMode = (): boolean => getConfigValue<boolean>("kai.agentMode") ?? false;
 export const getConfigSuperAgentMode = (): boolean =>
   getConfigValue<boolean>("kai.superAgentMode") ?? false;
+export const getExcludedDiagnosticSources = (): string[] =>
+  getConfigValue<string[]>("kai.excludedDiagnosticSources") ?? [];
 
 export const getProviderConfigStatus = (filepath: string): ProviderConfigStatus => {
   try {
