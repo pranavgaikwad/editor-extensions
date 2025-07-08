@@ -221,7 +221,7 @@ export class AnalyzerClient {
       );
       if (
         healthcheckResult === undefined ||
-        !(healthcheckResult instanceof Array) ||
+        !Array.isArray(healthcheckResult) ||
         healthcheckResult.length < 1
       ) {
         vscode.window.showErrorMessage(
