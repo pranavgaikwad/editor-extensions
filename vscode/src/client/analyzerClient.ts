@@ -195,7 +195,6 @@ export class AnalyzerClient {
           return result;
         } catch (error) {
           this.outputChannel.appendLine(`[Java] Command execution error: ${error}`);
-          throw error;
         }
       },
     );
@@ -205,29 +204,33 @@ export class AnalyzerClient {
     this.analyzerRpcConnection.listen();
     this.analyzerRpcConnection.sendNotification("start", { type: "start" });
     this.fireServerStateChange("running");
+    await this.runHealthCheck();
+  }
 
-    if (vscode.workspace.workspaceFolders && vscode.workspace.workspaceFolders.length > 1) {
-      this.outputChannel.appendLine("[Konveyor] Multi-root workspace detected.");
+  protected async runHealthCheck(): Promise<void> {
+    if (!this.analyzerRpcConnection) {
+      this.outputChannel.appendLine("Analyzer RPC connection is not established");
+      return;
     }
-    if (!vscode.workspace.isTrusted) {
-      this.outputChannel.appendLine("[Konveyor] Workspace is not trusted.");
-    }
-
-    // Test Java Language Server communication
     try {
-      this.outputChannel.appendLine("[Java] Testing Language Server communication...");
-      const testResult = await vscode.commands.executeCommand(
+      const healthcheckResult = await vscode.commands.executeCommand(
         "java.execute.workspaceCommand",
         "java.project.getAll",
       );
-      this.outputChannel.appendLine(`[Java] Test command result: ${JSON.stringify(testResult)}`);
-      if (testResult === undefined) {
-        this.outputChannel.appendLine(
-          "[Java] Warning: Language Server returned undefined for test command",
+      this.outputChannel.appendLine(
+        `Java Language Server Healthcheck result: ${JSON.stringify(healthcheckResult)}`,
+      );
+      if (
+        healthcheckResult === undefined ||
+        !(healthcheckResult instanceof Array) ||
+        healthcheckResult.length < 1
+      ) {
+        vscode.window.showErrorMessage(
+          "It appears that the Java Language Server is not running or the project configuration is not set up correctly. Analysis results may be degraded.",
         );
       }
     } catch (error) {
-      this.outputChannel.appendLine(`[Java] Error testing Language Server communication: ${error}`);
+      this.outputChannel.appendLine(`Error running Java Language Server healthcheck: ${error}`);
     }
   }
 
