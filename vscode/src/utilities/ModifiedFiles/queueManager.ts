@@ -19,7 +19,6 @@ export class MessageQueueManager {
     private modifiedFilesPromises: Array<Promise<void>>,
     private processedTokens: Set<string>,
     private pendingInteractions: Map<string, (response: any) => void>,
-    private maxTaskManagerIterations: number,
   ) {
     // Start background processor that runs continuously
     this.startBackgroundProcessor();
@@ -117,7 +116,6 @@ export class MessageQueueManager {
             this.modifiedFilesPromises,
             this.processedTokens,
             this.pendingInteractions,
-            this.maxTaskManagerIterations,
             this,
           );
 

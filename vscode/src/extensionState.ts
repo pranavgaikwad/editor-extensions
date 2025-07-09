@@ -6,6 +6,7 @@ import {
   KaiFsCache,
   KaiInteractiveWorkflow,
   SolutionServerClient,
+  KaiModelProvider,
 } from "@editor-extensions/agentic";
 import { Immutable } from "immer";
 import { IssuesModel } from "./issueView";
@@ -34,7 +35,7 @@ export interface ExtensionState {
     workflow: KaiInteractiveWorkflow | undefined;
     isInitialized: boolean;
     init: (config: {
-      model: any;
+      modelProvider: KaiModelProvider;
       workspaceDir: string;
       solutionServerClient?: SolutionServerClient;
     }) => Promise<void>;
@@ -48,4 +49,5 @@ export interface ExtensionState {
   lastMessageId: string;
   currentTaskManagerIterations: number;
   logger: winston.Logger;
+  modelProvider: KaiModelProvider | undefined;
 }

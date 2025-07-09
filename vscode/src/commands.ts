@@ -55,7 +55,6 @@ import { fixGroupOfIncidents, IncidentTypeItem } from "./issueView";
 import { paths } from "./paths";
 import { checkIfExecutable, copySampleProviderSettings } from "./utilities/fileUtils";
 import { handleConfigureCustomRules } from "./utilities/profiles/profileActions";
-import { getModelConfig, ModelProvider } from "./client/modelProvider";
 import { createPatch, createTwoFilesPatch } from "diff";
 import { v4 as uuidv4 } from "uuid";
 import { processMessage } from "./utilities/ModifiedFiles/processMessage";
@@ -162,13 +161,11 @@ const commandsMap: (
 
       try {
         // Get the model provider configuration from settings YAML
-        const modelConfig = await getModelConfig(paths().settingsYaml);
-        if (!modelConfig) {
-          throw new Error("Model provider configuration not found in settings YAML.");
+        if (!state.modelProvider) {
+          throw new Error(
+            "Chat model is not initialized. Please check your model provider settings.",
+          );
         }
-
-        // Initialize the appropriate model based on the config
-        const model = ModelProvider.fromConfig(modelConfig);
 
         // Get the profile name from the incidents
         const profileName = incidents[0]?.activeProfileName;
@@ -183,7 +180,7 @@ const commandsMap: (
         // Set the state to indicate we're fetching a solution
 
         await state.workflowManager.init({
-          model: model,
+          modelProvider: state.modelProvider,
           workspaceDir: state.data.workspaceRoot,
           solutionServerClient: state.solutionServerClient,
         });
@@ -194,13 +191,6 @@ const commandsMap: (
         // Track processed message tokens to prevent duplicates
         const processedTokens = new Set<string>();
 
-        // TODO (pgaikwad) - revisit this
-        // this is a number I am setting for demo purposes
-        // until we have a full UI support. we will only
-        // process child issues until the depth of 1
-        const maxTaskManagerIterations = 1;
-        // Reset task manager iterations for new solution
-        state.currentTaskManagerIterations = 0;
         // Clear any existing modified files state at the start of a new solution
         state.modifiedFiles.clear();
         const modifiedFilesPromises: Array<Promise<void>> = [];
@@ -213,7 +203,6 @@ const commandsMap: (
           modifiedFilesPromises,
           processedTokens,
           pendingInteractions,
-          maxTaskManagerIterations,
         );
 
         // Store the resolver function in the state so webview handler can access it

@@ -97,15 +97,7 @@ const handleTasksInteraction = async (
   workflow: KaiInteractiveWorkflow,
   queueManager: MessageQueueManager,
   pendingInteractions: Map<string, (response: any) => void>,
-  maxTaskManagerIterations: number,
 ): Promise<void> => {
-  // Check if we've exceeded max iterations
-  if (state.currentTaskManagerIterations >= maxTaskManagerIterations) {
-    (msg.data as KaiUserInteraction).response = { yesNo: false };
-    await workflow.resolveUserInteraction(msg as any);
-    return;
-  }
-
   // Increment iteration counter
   state.currentTaskManagerIterations += 1;
 
@@ -172,7 +164,6 @@ export const processMessageByType = async (
   modifiedFilesPromises: Array<Promise<void>>,
   processedTokens: Set<string>,
   pendingInteractions: Map<string, (response: any) => void>,
-  maxTaskManagerIterations: number,
   queueManager: MessageQueueManager,
 ): Promise<void> => {
   switch (msg.type) {
@@ -280,14 +271,7 @@ export const processMessageByType = async (
           break;
         }
         case "tasks": {
-          await handleTasksInteraction(
-            msg,
-            state,
-            workflow,
-            queueManager,
-            pendingInteractions,
-            maxTaskManagerIterations,
-          );
+          await handleTasksInteraction(msg, state, workflow, queueManager, pendingInteractions);
           break;
         }
         default: {
