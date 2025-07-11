@@ -16,21 +16,21 @@ export function summarizeTasks(tasks: TasksList): string {
     uriToTasksMap.get(uri.fsPath)?.push(task.toString());
   });
 
-  let summary = "# New issues:\n";
+  let summary = "### New issues:\n";
   uriToTasksMap.forEach((taskList, uri) => {
-    summary += `- ${taskList.length} new issues in *${basename(uri)}*.\n`;
+    summary += `- ${taskList.length} new issues in **${basename(uri)}**.\n`;
     const uniqueTasks = Array.from(new Set(taskList));
     uniqueTasks.slice(0, Math.min(2, uniqueTasks.length)).forEach((task) => {
       summary += `  - ${task.length > 200 ? task.slice(0, 197) + "..." : task}\n`;
     });
     if (taskList.length > 2) {
-      summary += `  ...and ${taskList.length - Math.min(2, uniqueTasks.length)} more\n`;
+      summary += `   ...and *${taskList.length - Math.min(2, uniqueTasks.length)} more*\n`;
     }
   });
 
   if (tasks.discardedTasks.length > 0) {
     summary +=
-      "# The following issues were identified but have been discarded due to unsuccessful resolution attempts in the previous iterations:\n";
+      "### The following issues were identified but have been discarded due to unsuccessful resolution attempts in the previous iterations:\n";
     tasks.discardedTasks.forEach((task) => {
       const strippedTask = task.toString().replace(/[`*_{}[\]()#+\-.!]/g, "");
       summary += `- ${strippedTask.length > 200 ? strippedTask.slice(0, 197) + "..." : strippedTask}\n`;
