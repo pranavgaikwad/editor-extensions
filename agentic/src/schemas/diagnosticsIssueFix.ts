@@ -1,7 +1,7 @@
 import { Annotation, MessagesAnnotation } from "@langchain/langgraph";
 
-import { BaseInputMetaState } from "./base";
 import { type KaiModifiedFile } from "../types";
+import { BaseInputMetaState, BaseOutputMetaState } from "./base";
 
 // different types of agents available
 export type AgentName = "generalFix" | "javaDependency" | "properties";
@@ -19,6 +19,7 @@ export const DiagnosticsPlannerInputState = Annotation.Root({
 
 // output state for the planner node
 export const DiagnosticsPlannerOutputState = Annotation.Root({
+  ...BaseOutputMetaState.spec,
   // list of agents and detailed instructions for them to work issues
   plannerOutputNominatedAgents: Annotation<
     | Array<{
@@ -39,6 +40,7 @@ export const GeneralIssueFixInputState = Annotation.Root({
 
 // output state for the node that fixes general issues
 export const GeneralIssueFixOutputState = Annotation.Root({
+  ...BaseOutputMetaState.spec,
   ...MessagesAnnotation.spec,
   outputModifiedFilesFromGeneralFix: Annotation<Array<KaiModifiedFile> | undefined>,
 });

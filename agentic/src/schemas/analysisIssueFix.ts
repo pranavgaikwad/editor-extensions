@@ -1,7 +1,7 @@
 import { Annotation } from "@langchain/langgraph";
 import { EnhancedIncident } from "@editor-extensions/shared";
 
-import { BaseInputMetaState } from "./base";
+import { BaseInputMetaState, BaseOutputMetaState } from "./base";
 
 const arrayReducer = <T>(left: T[], right: T | T[]): T[] => {
   if (Array.isArray(right)) {
@@ -21,6 +21,7 @@ export const AnalysisIssueFixInputState = Annotation.Root({
 
 // output state for node that fixes an analysis issue
 export const AnalysisIssueFixOutputState = Annotation.Root({
+  ...BaseOutputMetaState.spec,
   outputUpdatedFileUri: Annotation<string | undefined>,
   outputUpdatedFile: Annotation<string | undefined>,
   outputAdditionalInfo: Annotation<string | undefined>,
@@ -66,5 +67,6 @@ export const SummarizeAdditionalInfoOutputState = Annotation.Root({
 
 // output state for node that summarizes changes done so far into history
 export const SummarizeHistoryOutputState = Annotation.Root({
+  ...BaseOutputMetaState.spec,
   summarizedHistory: Annotation<string>,
 });

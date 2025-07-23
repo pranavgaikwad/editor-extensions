@@ -1,4 +1,5 @@
 import * as vscode from "vscode";
+import * as pathlib from "path";
 import { KONVEYOR_CONFIG_KEY } from "./constants";
 import { ExtensionState } from "../extensionState";
 import {
@@ -9,6 +10,7 @@ import {
   getEffortValue,
   SolutionEffortLevel,
 } from "@editor-extensions/shared";
+import { fileURLToPath } from "url";
 
 function getConfigValue<T>(key: string): T | undefined {
   return vscode.workspace.getConfiguration(KONVEYOR_CONFIG_KEY)?.get<T>(key);
@@ -60,7 +62,10 @@ export const getConfigAnalyzeOnSave = (): boolean => {
 };
 export const getConfigDiffEditorType = (): string =>
   getConfigValue<"diff" | "merge">("diffEditorType") || "diff";
-export const getCacheDir = (): string | undefined => getConfigValue<string>("kai.cacheDir");
+export const getCacheDir = (workspaceRoot: string | undefined): string | undefined =>
+  getWorkspaceRelativePath(getConfigValue<string>("kai.cacheDir"), workspaceRoot);
+export const getTraceDir = (workspaceRoot: string | undefined): string | undefined =>
+  getWorkspaceRelativePath(getConfigValue<string>("kai.traceDir"), workspaceRoot);
 export const getTraceEnabled = (): boolean => getConfigValue<boolean>("kai.traceEnabled") || false;
 export const getConfigKaiDemoMode = (): boolean => getConfigValue<boolean>("kai.demoMode") ?? false;
 
@@ -225,4 +230,24 @@ export function updateActiveProfileValidity(draft: ExtensionData, assetRulesetPa
   if (rulesets.length === 0) {
     draft.configErrors.push(createConfigError.noCustomRules());
   }
+}
+
+function getWorkspaceRelativePath(
+  path: string | undefined,
+  workspaceRoot: string | undefined,
+): string | undefined {
+  if (!path) {
+    return undefined;
+  }
+  if (!workspaceRoot || pathlib.isAbsolute(path)) {
+    return path;
+  }
+  return pathlib.join(fileUriToPath(workspaceRoot), path);
+}
+
+export function fileUriToPath(path: string): string {
+  const cleanPath = path.startsWith("file://") ? fileURLToPath(path) : path;
+  return process.platform === "win32" && cleanPath.startsWith("/")
+    ? cleanPath.replace("/", "")
+    : cleanPath;
 }

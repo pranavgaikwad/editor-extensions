@@ -7,7 +7,7 @@ import {
   KaiInteractiveWorkflow,
   SolutionServerClient,
   KaiModelProvider,
-} from "@editor-extensions/agentic";
+} from "../../agentic/src";
 import { Immutable } from "immer";
 import { IssuesModel } from "./issueView";
 import { DiagnosticTaskManager } from "./taskManager/taskManager";

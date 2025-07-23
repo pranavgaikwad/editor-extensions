@@ -586,6 +586,16 @@
           "scope": "window",
           "order": 50
         },
+        "konveyor.kai.traceDir": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "default": null,
+          "description": "Path to a directory containing traces of LLM interactions",
+          "scope": "window",
+          "order": 50
+        },
         "konveyor.kai.traceEnabled": {
           "type": "boolean",
           "default": false,

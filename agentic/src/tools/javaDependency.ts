@@ -1,5 +1,8 @@
 import { z } from "zod";
+import * as winston from "winston";
 import { DynamicStructuredTool } from "@langchain/core/tools";
+
+import { ToolResponseCache } from "./cache";
 
 interface MavenResponseDoc {
   g: string;
@@ -14,6 +17,17 @@ interface MavenApiResponse {
 }
 
 export class JavaDependencyTools {
+  private readonly logger: winston.Logger;
+
+  constructor(
+    private readonly cache: ToolResponseCache,
+    logger: winston.Logger,
+  ) {
+    this.logger = logger.child({
+      component: "JavaDependencyTools",
+    });
+  }
+
   all(): DynamicStructuredTool[] {
     return [this.searchFQDNTool()];
   }
@@ -37,6 +51,17 @@ export class JavaDependencyTools {
         groupID: string;
         version: string;
       }) => {
+        const cacheKey = {
+          artifactID,
+          groupID,
+          version,
+        };
+        const cachedResponse = await this.cache.lookup<string>("searchFqdn", cacheKey);
+        if (cachedResponse) {
+          return cachedResponse;
+        }
+
+        let response: string = `No dependencies found matching given search criteria`;
         const query = [artifactID, groupID, version]
           .filter(Boolean)
           .map((val, idx) => {
@@ -59,37 +84,35 @@ export class JavaDependencyTools {
           };
           const resp = await fetch(url, fetchOptions);
           if (resp.status !== 200) {
-            const err = `Maven Central API returned status code: ${resp.status}`;
-            console.error(err);
-            return err;
-          }
-          const output = (await resp.json()) as MavenApiResponse;
-          const docs = output?.response?.docs.filter(Boolean);
-
-          if (!docs || docs.length === 0) {
-            return `No dependencies found matching given search criteria`;
-          }
-
-          const depToString = (dep: MavenResponseDoc) =>
-            `ArtifactID: ${dep.a}, GroupID: ${dep.g}${dep.latestVersion ? `, LatestVersion: ${dep.latestVersion}` : ``}`;
-
-          if (docs.length > 1) {
-            return docs.map((d) => depToString(d)).join("\n - ");
-          } else if (docs.length === 1) {
-            return depToString(docs[0]);
+            response = `Maven Central API returned status code: ${resp.status}`;
+            this.logger.error(response);
           } else {
-            return `No dependencies found matching given search criteria`;
+            const output = (await resp.json()) as MavenApiResponse;
+            const docs = output?.response?.docs.filter(Boolean);
+
+            if (docs && docs.length) {
+              const depToString = (dep: MavenResponseDoc) =>
+                `ArtifactID: ${dep.a}, GroupID: ${dep.g}${dep.latestVersion ? `, LatestVersion: ${dep.latestVersion}` : ``}`;
+
+              if (docs.length > 1) {
+                response = docs.map((d) => depToString(d)).join("\n - ");
+              } else if (docs.length === 1) {
+                response = depToString(docs[0]);
+              }
+            }
           }
         } catch (error: any) {
           if (error.name === "AbortError") {
-            console.error("Request to Maven Central timed out.");
+            this.logger.error("Request to Maven Central timed out.");
           } else {
-            console.error("Error fetching from Maven Central:", error);
+            this.logger.error("Error fetching from Maven Central:", error);
           }
-          return `Encountered error retrieving dependencies: ${String(error)}`;
+          response = `Encountered error retrieving dependencies: ${String(error)}`;
         } finally {
           clearTimeout(timeoutId);
         }
+        await this.cache.update<string>("searchFqdn", cacheKey, response);
+        return response;
       },
     });
   };

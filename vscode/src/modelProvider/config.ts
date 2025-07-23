@@ -1,10 +1,13 @@
 import { parse } from "yaml";
+import * as pathlib from "path";
+import * as winston from "winston";
 import { workspace, Uri } from "vscode";
 import { KaiModelProvider } from "@editor-extensions/agentic";
 
-import { ParsedModelConfig } from "./types";
+import { ModelProviderTracer, ParsedModelConfig, type ModelProviderCache } from "./types";
 import { ModelCreators } from "./modelCreator";
 import { BaseModelProvider, ModelProviders, runModelHealthCheck } from "./modelProvider";
+import { FileBasedLLMCache, FileBasedLLMTracer, NoCacheNoTrace } from "./cache";
 
 export async function parseModelConfig(yamlUri: Uri): Promise<ParsedModelConfig> {
   const yamlFile = await workspace.fs.readFile(yamlUri);
@@ -33,6 +36,9 @@ export async function parseModelConfig(yamlUri: Uri): Promise<ParsedModelConfig>
 
 export async function getModelProviderFromConfig(
   parsedConfig: ParsedModelConfig,
+  logger: winston.Logger,
+  cacheDir: string | undefined = undefined,
+  traceDir: string | undefined = undefined,
 ): Promise<KaiModelProvider> {
   if (!ModelCreators[parsedConfig.config.provider]) {
     throw new Error("Unsupported model provider");
@@ -65,5 +71,30 @@ export async function getModelProviderFromConfig(
 
   const capabilities = await runModelHealthCheck(streamingModel, nonStreamingModel);
 
-  return new BaseModelProvider(streamingModel, nonStreamingModel, capabilities);
+  const subDir = (dir: string): string =>
+    pathlib.join(
+      dir,
+      parsedConfig.config.provider,
+      (parsedConfig.config.args.model ?? parsedConfig.config.args.model_id ?? "").replace(
+        /[^a-zA-Z0-9_-]/g,
+        "_",
+      ),
+    );
+
+  const modelCache: ModelProviderCache = cacheDir
+    ? new FileBasedLLMCache(logger, subDir(cacheDir))
+    : new NoCacheNoTrace();
+
+  const modelTracer: ModelProviderTracer = traceDir
+    ? new FileBasedLLMTracer(logger, subDir(traceDir))
+    : new NoCacheNoTrace();
+
+  return new BaseModelProvider(
+    streamingModel,
+    nonStreamingModel,
+    capabilities,
+    logger,
+    modelCache,
+    modelTracer,
+  );
 }

@@ -8,6 +8,7 @@ import {
 import { promises as fsPromises } from "fs";
 import { type DynamicStructuredTool } from "@langchain/core/tools";
 
+import { getCacheKey } from "../utils";
 import {
   type SummarizeAdditionalInfoInputState,
   type AnalysisIssueFixInputState,
@@ -174,6 +175,7 @@ export class AnalysisIssueFix extends BaseNode {
         outputReasoning: undefined,
         outputUpdatedFileUri: state.inputFileUri,
         outputHints: [],
+        iterationCount: state.iterationCount,
       };
     }
 
@@ -252,10 +254,16 @@ Write the step by step reasoning in this markdown section. If you are unsure of 
 If you have any additional details or steps that need to be performed, put it here. Do not summarize any of the changes you already made in this section. Only mention any additional changes needed.`);
 
     console.debug(humanMessage.content);
-    const response = await this.streamOrInvoke([sysMessage, humanMessage], {
-      emitResponseChunks: true,
-      enableTools: false,
-    });
+    const response = await this.streamOrInvoke(
+      [sysMessage, humanMessage],
+      {
+        emitResponseChunks: true,
+        enableTools: false,
+      },
+      {
+        cacheKey: getCacheKey(state),
+      },
+    );
 
     if (!response) {
       return {
@@ -264,6 +272,7 @@ If you have any additional details or steps that need to be performed, put it he
         outputReasoning: undefined,
         outputUpdatedFileUri: state.inputFileUri,
         outputHints: [],
+        iterationCount: state.iterationCount,
       };
     }
 
@@ -275,6 +284,7 @@ If you have any additional details or steps that need to be performed, put it he
       outputAdditionalInfo: additionalInfo,
       outputUpdatedFileUri: state.inputFileUri,
       outputHints: hints.map((hint) => hint.hint_id),
+      iterationCount: state.iterationCount + 1,
     };
   }
 
@@ -318,12 +328,18 @@ ${
 `,
     );
 
-    const response = await this.streamOrInvoke([sys_message, human_message], {
-      // this is basically thinking part, we
-      // don't want to share with user this part
-      emitResponseChunks: false,
-      enableTools: false,
-    });
+    const response = await this.streamOrInvoke(
+      [sys_message, human_message],
+      {
+        // this is basically thinking part, we
+        // don't want to share with user this part
+        emitResponseChunks: false,
+        enableTools: false,
+      },
+      {
+        cacheKey: getCacheKey(state, "AdditionalInfo"),
+      },
+    );
 
     return {
       summarizedAdditionalInfo: this.aiMessageToString(response),
@@ -338,6 +354,7 @@ ${
     if (!state.inputAllReasoning) {
       return {
         summarizedHistory: "",
+        iterationCount: state.iterationCount,
       };
     }
 
@@ -356,19 +373,27 @@ Here are the notes:
 ${state.inputAllReasoning}`,
     );
 
-    const response = await this.streamOrInvoke([sys_message, human_message], {
-      emitResponseChunks: false,
-      enableTools: false,
-    });
+    const response = await this.streamOrInvoke(
+      [sys_message, human_message],
+      {
+        emitResponseChunks: false,
+        enableTools: false,
+      },
+      {
+        cacheKey: getCacheKey(state, "History"),
+      },
+    );
 
     if (!response) {
       return {
         summarizedHistory: "",
+        iterationCount: state.iterationCount,
       };
     }
 
     return {
       summarizedHistory: this.aiMessageToString(response),
+      iterationCount: state.iterationCount + 2, // since these steps happen in parallel, we increment by 2
     };
   }
 

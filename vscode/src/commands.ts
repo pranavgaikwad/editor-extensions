@@ -26,10 +26,7 @@ import {
   ChatMessageType,
   GetSolutionResult,
 } from "@editor-extensions/shared";
-import {
-  type KaiWorkflowMessage,
-  type KaiInteractiveWorkflowInput,
-} from "@editor-extensions/agentic";
+import { type KaiWorkflowMessage, type KaiInteractiveWorkflowInput } from "../../agentic/src";
 import {
   applyAll,
   discardAll,
@@ -49,6 +46,7 @@ import {
   updateGetSolutionMaxPriority,
   getConfigAgentMode,
   getConfigSuperAgentMode,
+  getCacheDir,
 } from "./utilities/configuration";
 import { runPartialAnalysis } from "./analysis";
 import { fixGroupOfIncidents, IncidentTypeItem } from "./issueView";
@@ -250,6 +248,7 @@ const commandsMap: (
             programmingLanguage: "Java",
             enableAdditionalInformation: agentModeEnabled,
             enableDiagnostics: getConfigSuperAgentMode(),
+            cacheDir: getCacheDir(state.data.workspaceRoot) || undefined,
           } as KaiInteractiveWorkflowInput);
 
           // Wait for all message processing to complete before proceeding
@@ -421,12 +420,14 @@ const commandsMap: (
           draft.chatMessages.push({
             messageToken: `m${Date.now()}`,
             kind: ChatMessageType.String,
-            value: { message: `Error: ${error.message}` },
+            value: { message: `Error: ${error instanceof Error ? error.message : String(error)}` },
             timestamp: new Date().toISOString(),
           });
         });
 
-        window.showErrorMessage(`Failed to generate solution: ${error.message}`);
+        window.showErrorMessage(
+          `Failed to generate solution: ${error instanceof Error ? error.message : String(error)}`,
+        );
       }
     },
     "konveyor.getSuccessRate": async () => {

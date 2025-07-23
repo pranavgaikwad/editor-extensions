@@ -81,6 +81,7 @@ export interface KaiWorkflowInitOptions {
   workspaceDir: string;
   fsCache: KaiFsCache;
   solutionServerClient: SolutionServerClient;
+  cacheDir?: string;
 }
 
 export interface KaiWorkflowInput {

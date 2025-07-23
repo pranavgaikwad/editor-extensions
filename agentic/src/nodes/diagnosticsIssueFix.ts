@@ -9,6 +9,7 @@ import {
 } from "@langchain/core/messages";
 import { type DynamicStructuredTool } from "@langchain/core/tools";
 
+import { getCacheKey } from "../utils";
 import {
   type KaiModelProvider,
   type KaiUserInteractionMessage,
@@ -118,18 +119,24 @@ export class DiagnosticsIssueFix extends BaseNode {
           nextState.shouldEnd = false;
           // group tasks by uris
           const newTasks: { uri: string; tasks: string[] }[] =
-            response.data.response.tasks?.reduce(
-              (acc, val) => {
-                const existing = acc.find((entry) => entry.uri === val.uri);
-                if (existing) {
-                  existing.tasks.push(val.task);
-                } else {
-                  acc.push({ uri: val.uri, tasks: [val.task] });
-                }
-                return acc;
-              },
-              [] as Array<{ uri: string; tasks: string[] }>,
-            ) ?? [];
+            response.data.response.tasks
+              ?.reduce(
+                (acc, val) => {
+                  const existing = acc.find((entry) => entry.uri === val.uri);
+                  if (existing) {
+                    existing.tasks.push(val.task);
+                  } else {
+                    acc.push({ uri: val.uri, tasks: [val.task] });
+                  }
+                  return acc;
+                },
+                [] as Array<{ uri: string; tasks: string[] }>,
+              )
+              .map((group) => ({
+                ...group,
+                tasks: group.tasks.sort(),
+              }))
+              .sort((a, b) => a.uri.localeCompare(b.uri)) ?? [];
           if (!newTasks || newTasks.length < 1) {
             nextState.shouldEnd = true;
           }
@@ -195,6 +202,7 @@ export class DiagnosticsIssueFix extends BaseNode {
     ) {
       return {
         plannerOutputNominatedAgents: [],
+        iterationCount: state.iterationCount,
       };
     }
 
@@ -255,19 +263,27 @@ Instructions for Agent A to solve Issue 1, Issue 2, etc. (mention specific issue
 Instructions for Agent B to solve Issue 3, Issue 4, etc. (mention specific issues)
 `);
 
-    const response = await this.streamOrInvoke([sys_message, human_message], {
-      enableTools: false,
-      emitResponseChunks: false,
-    });
+    const response = await this.streamOrInvoke(
+      [sys_message, human_message],
+      {
+        enableTools: false,
+        emitResponseChunks: false,
+      },
+      {
+        cacheKey: getCacheKey(state),
+      },
+    );
 
     if (!response) {
       return {
         plannerOutputNominatedAgents: [],
+        iterationCount: state.iterationCount,
       };
     }
 
     return {
       plannerOutputNominatedAgents: this.parsePlannerResponse(response),
+      iterationCount: state.iterationCount + 1,
     };
   }
 
@@ -304,20 +320,28 @@ ${
       );
     }
 
-    const response = await this.streamOrInvoke(chat, {
-      toolsSelectors: [".*File.*"],
-    });
+    const response = await this.streamOrInvoke(
+      chat,
+      {
+        toolsSelectors: [".*File.*"],
+      },
+      {
+        cacheKey: getCacheKey(state),
+      },
+    );
 
     if (!response) {
       return {
         messages: [new AIMessage(`DONE`)],
         outputModifiedFilesFromGeneralFix: [],
+        iterationCount: state.iterationCount,
       };
     }
 
     return {
       messages: [response],
       outputModifiedFilesFromGeneralFix: [],
+      iterationCount: state.iterationCount + 1,
     };
   }
 
@@ -363,18 +387,26 @@ ${state.inputInstructionsForGeneralFix}
       chat.push(human_message);
     }
 
-    const response = await this.streamOrInvoke(chat);
+    const response = await this.streamOrInvoke(
+      chat,
+      {},
+      {
+        cacheKey: getCacheKey(state),
+      },
+    );
 
     if (!response) {
       return {
         messages: [new AIMessage(`DONE`)],
         outputModifiedFilesFromGeneralFix: [],
+        iterationCount: state.iterationCount,
       };
     }
 
     return {
       messages: [response],
       outputModifiedFilesFromGeneralFix: [],
+      iterationCount: state.iterationCount + 1,
     };
   }
 

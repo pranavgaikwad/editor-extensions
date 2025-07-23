@@ -1,18 +1,19 @@
 import { z } from "zod";
+import * as winston from "winston";
 
 import {
   BindToolsInput,
   type BaseChatModel,
   type BaseChatModelCallOptions,
 } from "@langchain/core/language_models/chat_models";
-import { type Runnable, type RunnableConfig } from "@langchain/core/runnables";
+import { type Runnable } from "@langchain/core/runnables";
 import { DynamicStructuredTool } from "@langchain/core/tools";
 import { IterableReadableStream } from "@langchain/core/utils/stream";
 import { type BaseLanguageModelInput } from "@langchain/core/language_models/base";
 import { SystemMessage, HumanMessage, type AIMessageChunk } from "@langchain/core/messages";
 import { KaiModelProvider, KaiModelProviderInvokeCallOptions } from "@editor-extensions/agentic";
 
-import { type ModelCapabilities } from "./types";
+import { type ModelCapabilities, type ModelProviderCache, type ModelProviderTracer } from "./types";
 
 // If there are special cases for a model provider, we will add them here
 export const ModelProviders: Record<string, () => KaiModelProvider> = {};
@@ -25,6 +26,7 @@ export const ModelProviders: Record<string, () => KaiModelProvider> = {};
  * @param streamingModel - The streaming model to use
  * @param nonStreamingModel - The non-streaming model to use
  * @param capabilities - The capabilities of the model
+ * @param cache - The cache to use
  * @param demoMode - Whether the model is in demo mode
  * @param tools - The tools to use
  * @param toolKwargs - The tool kwargs to use
@@ -34,7 +36,9 @@ export class BaseModelProvider implements KaiModelProvider {
     private readonly streamingModel: BaseChatModel,
     private readonly nonStreamingModel: BaseChatModel,
     private readonly capabilities: ModelCapabilities,
-    private readonly demoMode: boolean = false,
+    private readonly logger: winston.Logger,
+    private readonly cache: ModelProviderCache,
+    private readonly tracer: ModelProviderTracer,
     private readonly tools: BindToolsInput[] | undefined = undefined,
     private readonly toolKwargs: Partial<KaiModelProviderInvokeCallOptions> | undefined = undefined,
   ) {}
@@ -50,7 +54,9 @@ export class BaseModelProvider implements KaiModelProvider {
       this.streamingModel,
       this.nonStreamingModel,
       this.capabilities,
-      this.demoMode,
+      this.logger,
+      this.cache,
+      this.tracer,
       tools,
       kwargs,
     );
@@ -58,32 +64,95 @@ export class BaseModelProvider implements KaiModelProvider {
 
   async invoke(
     input: BaseLanguageModelInput,
-    options?: KaiModelProviderInvokeCallOptions,
+    options?: Partial<KaiModelProviderInvokeCallOptions> | undefined,
   ): Promise<AIMessageChunk> {
+    if (options && options.cacheKey) {
+      const cachedResult = await this.cache.lookup(input, options.cacheKey);
+      if (cachedResult) {
+        return cachedResult[0] as AIMessageChunk;
+      }
+    }
+
+    let result: AIMessageChunk;
     if (
       this.capabilities.supportsTools &&
       this.tools &&
       this.tools.length &&
       this.nonStreamingModel.bindTools
     ) {
-      return this.nonStreamingModel.bindTools(this.tools, this.toolKwargs).invoke(input, options);
+      result = await this.nonStreamingModel
+        .bindTools(this.tools, this.toolKwargs)
+        .invoke(input, options);
+    } else {
+      result = await this.nonStreamingModel.invoke(input, options);
     }
-    return this.nonStreamingModel.invoke(input, options);
+    if (options && options.cacheKey) {
+      this.cache.update(input, options.cacheKey, result);
+      this.tracer.trace(input, options.cacheKey, result);
+    }
+    return result;
   }
 
-  stream(
+  async stream(
     input: any,
-    options?: Partial<RunnableConfig> | undefined,
+    options?: Partial<KaiModelProviderInvokeCallOptions> | undefined,
   ): Promise<IterableReadableStream<any>> {
+    if (options && options.cacheKey) {
+      const cachedResult = await this.cache.lookup(input, options.cacheKey);
+      if (cachedResult) {
+        return new ReadableStream({
+          start(controller) {
+            controller.enqueue(cachedResult[0] as AIMessageChunk);
+            controller.close();
+          },
+        }) as IterableReadableStream<any>;
+      }
+    }
+
+    // Get the actual stream from the underlying model
+    let actualStream: IterableReadableStream<any>;
     if (
       this.capabilities.supportsToolsInStreaming &&
       this.tools &&
       this.tools.length &&
       this.streamingModel.bindTools
     ) {
-      return this.streamingModel.bindTools(this.tools, this.toolKwargs).stream(input, options);
+      actualStream = await this.streamingModel
+        .bindTools(this.tools, this.toolKwargs)
+        .stream(input, options);
+    } else {
+      actualStream = await this.streamingModel.stream(input, options);
     }
-    return this.streamingModel.stream(input, options);
+
+    // If no caching is needed, return the stream as-is
+    if (!options || !options.cacheKey) {
+      return actualStream;
+    }
+
+    let accumulatedResponse: AIMessageChunk | undefined;
+    const cache = this.cache;
+    const tracer = this.tracer;
+    return new ReadableStream({
+      async start(controller) {
+        try {
+          for await (const chunk of actualStream) {
+            if (!accumulatedResponse) {
+              accumulatedResponse = chunk;
+            } else {
+              accumulatedResponse = accumulatedResponse.concat(chunk);
+            }
+            controller.enqueue(chunk);
+          }
+          if (accumulatedResponse && options.cacheKey) {
+            await cache.update(input, options.cacheKey, accumulatedResponse);
+            await tracer.trace(input, options.cacheKey, accumulatedResponse);
+          }
+          controller.close();
+        } catch (error) {
+          controller.error(error);
+        }
+      },
+    }) as IterableReadableStream<any>;
   }
 
   toolCallsSupported(): boolean {

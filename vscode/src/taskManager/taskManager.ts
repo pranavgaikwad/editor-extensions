@@ -14,7 +14,7 @@ export class DiagnosticTask implements Task {
   }
 
   private unique_id(): string {
-    const data = `${this.uri.fsPath}:${this.diagnostic.message}:${this.diagnostic.severity}:${this.diagnostic.source}:${this.diagnostic.code?.toString}`;
+    const data = `${this.uri.fsPath}:${this.diagnostic.message}:${this.diagnostic.severity}:${this.diagnostic.source}:${this.diagnostic.code?.toString() ?? ""}`;
     return crypto.createHash("sha256").update(data).digest("hex");
   }
 

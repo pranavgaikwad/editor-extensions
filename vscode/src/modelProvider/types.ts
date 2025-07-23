@@ -1,4 +1,6 @@
+import { type BaseMessage } from "@langchain/core/messages";
 import { type BaseChatModel } from "@langchain/core/language_models/chat_models";
+import { type BaseLanguageModelInput } from "@langchain/core/language_models/base";
 
 export type SupportedModelProviders =
   | "AzureChatOpenAI"
@@ -37,4 +39,21 @@ export interface ModelCreator {
 export interface ModelCapabilities {
   supportsTools: boolean;
   supportsToolsInStreaming: boolean;
+}
+
+export interface ModelProviderCache {
+  lookup(input: BaseLanguageModelInput, cacheKey: string): Promise<BaseMessage[] | undefined>;
+  update(
+    input: BaseLanguageModelInput,
+    cacheKey: string,
+    value: BaseMessage,
+  ): Promise<string | undefined>;
+}
+
+export interface ModelProviderTracer {
+  trace(
+    input: BaseLanguageModelInput,
+    cacheKey: string,
+    value: BaseMessage,
+  ): Promise<string | undefined>;
 }
