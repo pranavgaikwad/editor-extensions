@@ -1,15 +1,15 @@
 import * as pathlib from "path";
-
-import { FileSystemTools } from "../src/tools/filesystem";
-import { SimpleInMemoryCache } from "../src/";
 import { format, Logger } from "winston";
 import { Console } from "winston/lib/winston/transports";
+
+import { InMemoryCacheWithRevisions } from "../src/";
+import { FileSystemTools } from "../src/tools/filesystem";
 
 describe("searchFilesTool", () => {
   it("should handle nested directories correctly", async () => {
     const fsToolsFactory = new FileSystemTools(
       pathlib.resolve(".", "tests", "test_data", "tools"),
-      new SimpleInMemoryCache(),
+      new InMemoryCacheWithRevisions(true),
       new Logger({
         level: "debug",
         format: format.combine(format.timestamp(), format.json()),

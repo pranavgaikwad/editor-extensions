@@ -1,4 +1,4 @@
 export * from "./types";
-export * from "./fsCache";
+export * from "./cache";
 export * from "./workflows";
 export * from "./clients/solutionServerClient";

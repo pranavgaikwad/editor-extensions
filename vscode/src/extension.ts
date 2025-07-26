@@ -8,9 +8,10 @@ import { ViolationCodeActionProvider } from "./ViolationCodeActionProvider";
 import { AnalyzerClient } from "./client/analyzerClient";
 import {
   KaiInteractiveWorkflow,
-  SimpleInMemoryCache,
+  InMemoryCacheWithRevisions,
   SolutionServerClient,
-} from "../../agentic/src";
+  FileBasedResponseCache,
+} from "@editor-extensions/agentic";
 import { KonveyorFileModel, registerDiffView } from "./diffView";
 import { MemFS } from "./data";
 import { Immutable, produce } from "immer";
@@ -111,7 +112,7 @@ class VsCodeExtension {
       memFs: new MemFS(),
       fileModel: new KonveyorFileModel(),
       issueModel: new IssuesModel(),
-      kaiFsCache: new SimpleInMemoryCache(),
+      kaiFsCache: new InMemoryCacheWithRevisions(true),
       taskManager,
       logger,
       get data() {
@@ -139,6 +140,14 @@ class VsCodeExtension {
               ...config,
               fsCache: this.state.kaiFsCache,
               solutionServerClient: this.state.solutionServerClient,
+              toolCache: new FileBasedResponseCache(
+                getConfigKaiDemoMode(), // cache enabled only when demo mode is on
+                (args) =>
+                  typeof args === "string" ? args : JSON.stringify(args, Object.keys(args).sort()),
+                (args) => (typeof args === "string" ? args : JSON.parse(args)),
+                getCacheDir(this.state.data.workspaceRoot),
+                this.state.logger,
+              ),
             });
             this.state.workflowManager.isInitialized = true;
           } catch (error) {

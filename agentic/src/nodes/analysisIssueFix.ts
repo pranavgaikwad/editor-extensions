@@ -18,7 +18,8 @@ import {
   type SummarizeHistoryOutputState,
 } from "../schemas/analysisIssueFix";
 import { BaseNode } from "./base";
-import { type KaiFsCache, type KaiModelProvider, KaiWorkflowMessageType } from "../types";
+import { type InMemoryCacheWithRevisions } from "../cache";
+import { type KaiModelProvider, KaiWorkflowMessageType } from "../types";
 import { type GetBestHintResult, SolutionServerClient } from "../clients/solutionServerClient";
 
 type IssueFixResponseParserState = "reasoning" | "updatedFile" | "additionalInfo";
@@ -27,7 +28,7 @@ export class AnalysisIssueFix extends BaseNode {
   constructor(
     modelProvider: KaiModelProvider,
     tools: DynamicStructuredTool[],
-    private readonly fsCache: KaiFsCache,
+    private readonly fsCache: InMemoryCacheWithRevisions<string, string>,
     private readonly workspaceDir: string,
     private readonly solutionServerClient: SolutionServerClient,
   ) {

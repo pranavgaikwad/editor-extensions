@@ -295,3 +295,19 @@ export interface ModifiedFileState {
 }
 
 export const KONVEYOR_OUTPUT_CHANNEL_NAME = "Konveyor Editor Extension";
+
+/**
+ * A general purpose cache to store and retrieve inputs and their corresponding outputs.
+ *
+ * @template K - The type of the input to cache.
+ * @template V - The type of the value for the given input to cache.
+ * @template C - The coordinates of the cache.
+ * @template O - Any additional options for the cache.
+ */
+export interface InputOutputCache<K, V, C, O> {
+  enabled: boolean;
+  get(input: K, opts?: O): Promise<V | undefined>;
+  set(input: K, value: V, opts?: O): Promise<C | undefined>;
+  invalidate(input: K, opts?: O): Promise<void>;
+  reset(): Promise<void>;
+}

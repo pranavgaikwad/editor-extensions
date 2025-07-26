@@ -1,11 +1,12 @@
 import { z } from "zod";
 import * as pathlib from "path";
+import { Logger } from "winston";
 import { promises as fs } from "fs";
 import { DynamicStructuredTool } from "@langchain/core/tools";
 
+import { KaiWorkflowMessageType } from "../types";
+import { InMemoryCacheWithRevisions } from "../cache";
 import { KaiWorkflowEventEmitter } from "../eventEmitter";
-import { type KaiFsCache, KaiWorkflowMessageType } from "../types";
-import { Logger } from "winston";
 
 function errorToString(err: unknown): string {
   if (err instanceof Error) {
@@ -23,7 +24,7 @@ export class FileSystemTools extends KaiWorkflowEventEmitter {
 
   constructor(
     private readonly workspaceDir: string,
-    private readonly fsCache: KaiFsCache,
+    private readonly fsCache: InMemoryCacheWithRevisions<string, string>,
     logger: Logger,
   ) {
     super();

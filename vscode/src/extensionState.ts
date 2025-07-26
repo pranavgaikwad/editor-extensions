@@ -3,11 +3,11 @@ import { KonveyorGUIWebviewViewProvider } from "./KonveyorGUIWebviewViewProvider
 import * as vscode from "vscode";
 import { AnalysisProfile, ExtensionData, ModifiedFileState } from "@editor-extensions/shared";
 import {
-  KaiFsCache,
-  KaiInteractiveWorkflow,
-  SolutionServerClient,
-  KaiModelProvider,
-} from "../../agentic/src";
+  type InMemoryCacheWithRevisions,
+  type KaiInteractiveWorkflow,
+  type SolutionServerClient,
+  type KaiModelProvider,
+} from "@editor-extensions/agentic";
 import { Immutable } from "immer";
 import { IssuesModel } from "./issueView";
 import { DiagnosticTaskManager } from "./taskManager/taskManager";
@@ -29,7 +29,7 @@ export interface ExtensionState {
   mutateData: (recipe: (draft: ExtensionData) => void) => Immutable<ExtensionData>;
   profiles?: AnalysisProfile[];
   activeProfileId?: string;
-  kaiFsCache: KaiFsCache;
+  kaiFsCache: InMemoryCacheWithRevisions<string, string>;
   taskManager: DiagnosticTaskManager;
   workflowManager: {
     workflow: KaiInteractiveWorkflow | undefined;

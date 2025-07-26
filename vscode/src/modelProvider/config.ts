@@ -4,10 +4,11 @@ import * as winston from "winston";
 import { workspace, Uri } from "vscode";
 import { KaiModelProvider } from "@editor-extensions/agentic";
 
-import { ModelProviderTracer, ParsedModelConfig, type ModelProviderCache } from "./types";
+import { ParsedModelConfig } from "./types";
 import { ModelCreators } from "./modelCreator";
+import { getCacheForModelProvider } from "./utils";
+import { getTraceEnabled, getConfigKaiDemoMode } from "../utilities/configuration";
 import { BaseModelProvider, ModelProviders, runModelHealthCheck } from "./modelProvider";
-import { FileBasedLLMCache, FileBasedLLMTracer, NoCacheNoTrace } from "./cache";
 
 export async function parseModelConfig(yamlUri: Uri): Promise<ParsedModelConfig> {
   const yamlFile = await workspace.fs.readFile(yamlUri);
@@ -81,20 +82,12 @@ export async function getModelProviderFromConfig(
       ),
     );
 
-  const modelCache: ModelProviderCache = cacheDir
-    ? new FileBasedLLMCache(logger, subDir(cacheDir))
-    : new NoCacheNoTrace();
-
-  const modelTracer: ModelProviderTracer = traceDir
-    ? new FileBasedLLMTracer(logger, subDir(traceDir))
-    : new NoCacheNoTrace();
-
   return new BaseModelProvider(
     streamingModel,
     nonStreamingModel,
     capabilities,
     logger,
-    modelCache,
-    modelTracer,
+    getCacheForModelProvider(getConfigKaiDemoMode(), logger, subDir(cacheDir ?? "")),
+    getCacheForModelProvider(getTraceEnabled(), logger, subDir(traceDir ?? ""), true),
   );
 }

@@ -1,8 +1,9 @@
+import { Logger } from "winston";
+import { createHash } from "crypto";
 import { EnhancedIncident } from "@editor-extensions/shared";
 import { AIMessage, AIMessageChunk } from "@langchain/core/messages";
 import { Annotation, type MessagesAnnotation } from "@langchain/langgraph";
 import { CompiledStateGraph, END, START, StateGraph } from "@langchain/langgraph";
-import crypto from "crypto";
 
 import {
   KaiUserInteractionMessage,
@@ -21,14 +22,13 @@ import {
   AnalysisIssueFixOutputState,
 } from "../schemas/analysisIssueFix";
 import { fileUriToPath } from "../utils";
-import { ToolResponseCache } from "../tools/cache";
 import { FileSystemTools } from "../tools/filesystem";
 import { KaiWorkflowEventEmitter } from "../eventEmitter";
 import { AnalysisIssueFix } from "../nodes/analysisIssueFix";
 import { JavaDependencyTools } from "../tools/javaDependency";
 import { DiagnosticsIssueFix } from "../nodes/diagnosticsIssueFix";
 import { AgentName, DiagnosticsOrchestratorState } from "../schemas/diagnosticsIssueFix";
-import { Logger } from "winston";
+
 export interface KaiInteractiveWorkflowInput extends KaiWorkflowInput {
   programmingLanguage: string;
   migrationHint: string;
@@ -102,10 +102,7 @@ export class KaiInteractiveWorkflow
   async init(options: KaiWorkflowInitOptions): Promise<void> {
     const workspaceDir = fileUriToPath(options.workspaceDir);
     const fsTools = new FileSystemTools(workspaceDir, options.fsCache, this.logger);
-    const depTools = new JavaDependencyTools(
-      new ToolResponseCache(this.logger, options.cacheDir),
-      this.logger,
-    );
+    const depTools = new JavaDependencyTools(options.toolCache, this.logger);
 
     const analysisIssueFixNodes = new AnalysisIssueFix(
       options.modelProvider,
@@ -494,6 +491,6 @@ export class KaiInteractiveWorkflow
       .sort((a, b) => a.uri.localeCompare(b.uri))
       .map((item) => JSON.stringify(item))
       .join("|");
-    return crypto.createHash("sha256").update(dataString).digest("hex").substring(0, 16);
+    return createHash("sha256").update(dataString).digest("hex").substring(0, 16);
   }
 }

@@ -1,19 +1,27 @@
 import { z } from "zod";
 import * as winston from "winston";
-
 import {
-  BindToolsInput,
+  type BindToolsInput,
   type BaseChatModel,
   type BaseChatModelCallOptions,
 } from "@langchain/core/language_models/chat_models";
 import { type Runnable } from "@langchain/core/runnables";
 import { DynamicStructuredTool } from "@langchain/core/tools";
-import { IterableReadableStream } from "@langchain/core/utils/stream";
+import { type IterableReadableStream } from "@langchain/core/utils/stream";
 import { type BaseLanguageModelInput } from "@langchain/core/language_models/base";
-import { SystemMessage, HumanMessage, type AIMessageChunk } from "@langchain/core/messages";
-import { KaiModelProvider, KaiModelProviderInvokeCallOptions } from "@editor-extensions/agentic";
+import {
+  SystemMessage,
+  HumanMessage,
+  type AIMessageChunk,
+  type BaseMessage,
+} from "@langchain/core/messages";
+import {
+  FileBasedResponseCache,
+  type KaiModelProvider,
+  type KaiModelProviderInvokeCallOptions,
+} from "@editor-extensions/agentic";
 
-import { type ModelCapabilities, type ModelProviderCache, type ModelProviderTracer } from "./types";
+import { type ModelCapabilities } from "./types";
 
 // If there are special cases for a model provider, we will add them here
 export const ModelProviders: Record<string, () => KaiModelProvider> = {};
@@ -37,8 +45,9 @@ export class BaseModelProvider implements KaiModelProvider {
     private readonly nonStreamingModel: BaseChatModel,
     private readonly capabilities: ModelCapabilities,
     private readonly logger: winston.Logger,
-    private readonly cache: ModelProviderCache,
-    private readonly tracer: ModelProviderTracer,
+    private readonly cache: FileBasedResponseCache<BaseLanguageModelInput, BaseMessage>,
+    // we use the cache as a tracer but with different directory and serializer/deserializer
+    private readonly tracer: FileBasedResponseCache<BaseLanguageModelInput, BaseMessage>,
     private readonly tools: BindToolsInput[] | undefined = undefined,
     private readonly toolKwargs: Partial<KaiModelProviderInvokeCallOptions> | undefined = undefined,
   ) {}
@@ -67,9 +76,11 @@ export class BaseModelProvider implements KaiModelProvider {
     options?: Partial<KaiModelProviderInvokeCallOptions> | undefined,
   ): Promise<AIMessageChunk> {
     if (options && options.cacheKey) {
-      const cachedResult = await this.cache.lookup(input, options.cacheKey);
+      const cachedResult = await this.cache.get(input, {
+        cacheSubDir: options.cacheKey,
+      });
       if (cachedResult) {
-        return cachedResult[0] as AIMessageChunk;
+        return cachedResult as AIMessageChunk;
       }
     }
 
@@ -87,8 +98,13 @@ export class BaseModelProvider implements KaiModelProvider {
       result = await this.nonStreamingModel.invoke(input, options);
     }
     if (options && options.cacheKey) {
-      this.cache.update(input, options.cacheKey, result);
-      this.tracer.trace(input, options.cacheKey, result);
+      this.cache.set(input, result, {
+        cacheSubDir: options.cacheKey,
+      });
+      this.tracer.set(input, result, {
+        cacheSubDir: options.cacheKey,
+        fileExt: "",
+      });
     }
     return result;
   }
@@ -98,11 +114,13 @@ export class BaseModelProvider implements KaiModelProvider {
     options?: Partial<KaiModelProviderInvokeCallOptions> | undefined,
   ): Promise<IterableReadableStream<any>> {
     if (options && options.cacheKey) {
-      const cachedResult = await this.cache.lookup(input, options.cacheKey);
+      const cachedResult = await this.cache.get(input, {
+        cacheSubDir: options.cacheKey,
+      });
       if (cachedResult) {
         return new ReadableStream({
           start(controller) {
-            controller.enqueue(cachedResult[0] as AIMessageChunk);
+            controller.enqueue(cachedResult as AIMessageChunk);
             controller.close();
           },
         }) as IterableReadableStream<any>;
@@ -144,8 +162,13 @@ export class BaseModelProvider implements KaiModelProvider {
             controller.enqueue(chunk);
           }
           if (accumulatedResponse && options.cacheKey) {
-            await cache.update(input, options.cacheKey, accumulatedResponse);
-            await tracer.trace(input, options.cacheKey, accumulatedResponse);
+            await cache.set(input, accumulatedResponse, {
+              cacheSubDir: options.cacheKey,
+            });
+            await tracer.set(input, accumulatedResponse, {
+              cacheSubDir: options.cacheKey,
+              fileExt: "",
+            });
           }
           controller.close();
         } catch (error) {

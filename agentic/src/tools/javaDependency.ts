@@ -2,7 +2,7 @@ import { z } from "zod";
 import * as winston from "winston";
 import { DynamicStructuredTool } from "@langchain/core/tools";
 
-import { ToolResponseCache } from "./cache";
+import { type FileBasedResponseCache } from "../cache";
 
 interface MavenResponseDoc {
   g: string;
@@ -20,7 +20,7 @@ export class JavaDependencyTools {
   private readonly logger: winston.Logger;
 
   constructor(
-    private readonly cache: ToolResponseCache,
+    private readonly cache: FileBasedResponseCache<Record<string, any>, string>,
     logger: winston.Logger,
   ) {
     this.logger = logger.child({
@@ -56,7 +56,10 @@ export class JavaDependencyTools {
           groupID,
           version,
         };
-        const cachedResponse = await this.cache.lookup<string>("searchFqdn", cacheKey);
+        const cacheSubDir = "searchFqdn";
+        const cachedResponse = await this.cache.get(cacheKey, {
+          cacheSubDir,
+        });
         if (cachedResponse) {
           return cachedResponse;
         }
@@ -111,7 +114,9 @@ export class JavaDependencyTools {
         } finally {
           clearTimeout(timeoutId);
         }
-        await this.cache.update<string>("searchFqdn", cacheKey, response);
+        await this.cache.set(cacheKey, response, {
+          cacheSubDir,
+        });
         return response;
       },
     });

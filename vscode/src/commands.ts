@@ -26,7 +26,10 @@ import {
   ChatMessageType,
   GetSolutionResult,
 } from "@editor-extensions/shared";
-import { type KaiWorkflowMessage, type KaiInteractiveWorkflowInput } from "../../agentic/src";
+import {
+  type KaiWorkflowMessage,
+  type KaiInteractiveWorkflowInput,
+} from "@editor-extensions/agentic";
 import {
   applyAll,
   discardAll,
