@@ -7,6 +7,7 @@ import {
   KaiWorkflowMessageType,
   KaiUserInteraction,
 } from "@editor-extensions/agentic";
+import { flattenCurrentTasks, summarizeTasks, type TasksList } from "../../taskManager";
 import { ExtensionState } from "../../extensionState";
 import { ChatMessageType, ToolMessageValue } from "@editor-extensions/shared";
 import { handleModifiedFileMessage } from "./handleModifiedFile";
@@ -45,21 +46,9 @@ const resetStuckAnalysisFlags = (state: ExtensionState): void => {
   }
 };
 
-// Helper function to format tasks for display
-const formatTasksForDisplay = (tasks: any[]): { uri: string; task: string }[] => {
-  return tasks.map((t) => ({
-    uri: t.getUri().fsPath,
-    task:
-      t.toString().length > 100
-        ? t.toString().slice(0, 100).replaceAll("`", "'").replaceAll(">", "") + "..."
-        : t.toString(),
-  }));
-};
-
 // Helper function to create tasks message
-const createTasksMessage = (tasks: { uri: string; task: string }[]): string => {
-  const uniqueTasks = [...new Set(tasks.map((t) => t.task))];
-  return `It appears that my fixes caused following issues:\n\n - ${uniqueTasks.join("\n * ")}\n\nDo you want me to continue fixing them?`;
+const createTasksMessage = (tasks: TasksList): string => {
+  return `It appears that my fixes caused following issues:\n\n - ${summarizeTasks(tasks)}\n\nDo you want me to continue fixing them?`;
 };
 
 // Helper function to handle user interaction promises uniformly
@@ -109,9 +98,8 @@ const handleTasksInteraction = async (
 
   // Get and format tasks
   const rawTasks = state.taskManager.getTasks();
-  const tasks = formatTasksForDisplay(rawTasks);
 
-  if (tasks.length === 0) {
+  if (rawTasks.currentTasks.length === 0) {
     // No tasks found - auto-reject
     (msg.data as KaiUserInteraction).response = { yesNo: false };
     await workflow.resolveUserInteraction(msg as any);
@@ -124,8 +112,8 @@ const handleTasksInteraction = async (
       messageToken: msg.id,
       timestamp: new Date().toISOString(),
       value: {
-        message: createTasksMessage(tasks),
-        tasksData: tasks,
+        message: createTasksMessage(rawTasks),
+        tasksData: flattenCurrentTasks(rawTasks),
       },
       quickResponses: [
         { id: "yes", content: "Yes" },
