@@ -4,11 +4,13 @@
   "private": true,
   "type": "module",
   "types": "./dist/index.d.ts",
-  "main": "./dist/index.js",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js",
+      "require": "./dist/index.cjs",
       "default": "./dist/index.js"
     },
     "./package.json": "./package.json"
@@ -20,8 +22,8 @@
     "lint": "eslint .",
     "lint:fix": "eslint --fix .",
     "prebuild": "npm run clean",
-    "build": "tsup src/index.ts --dts --format esm --out-dir dist --clean",
-    "dev": "tsup src/index.ts --dts --format esm --out-dir dist --watch"
+    "build": "tsup src/index.ts --dts --format esm,cjs --out-dir dist --clean",
+    "dev": "tsup src/index.ts --dts --format esm,cjs --out-dir dist --watch"
   },
   "lint-staged": {
     "*.{js,cjs,mjs,ts,cts,mts}": "eslint --fix",
