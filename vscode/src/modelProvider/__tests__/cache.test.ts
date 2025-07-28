@@ -101,7 +101,8 @@ describe("test FSCacheAndTracer", () => {
     const cacheSubDir = "simpleMessage";
     const result = await fsTracer.set("Hello", new AIMessage("world!"), {
       cacheSubDir,
-      fileExt: "",
+      inputFileExt: "",
+      outputFileExt: "",
     });
     await verifyRecordsExist(result);
     await verifyTraceContent(
@@ -143,7 +144,8 @@ Content: world!`,
     const cacheSubDir = "complexMessage";
     const result = await fsTracer.set(longInput, new AIMessage("World!"), {
       cacheSubDir,
-      fileExt: "",
+      inputFileExt: "",
+      outputFileExt: "",
     });
     await verifyRecordsExist(result);
     await verifyTraceContent(

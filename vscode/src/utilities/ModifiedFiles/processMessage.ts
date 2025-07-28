@@ -48,7 +48,7 @@ const resetStuckAnalysisFlags = (state: ExtensionState): void => {
 
 // Helper function to create tasks message
 const createTasksMessage = (tasks: TasksList): string => {
-  return `It appears that my fixes caused following issues:\n\n - ${summarizeTasks(tasks)}\n\nDo you want me to continue fixing them?`;
+  return `It appears that my fixes caused following issues:\n\n${summarizeTasks(tasks)}\n\nDo you want me to continue fixing them?`;
 };
 
 // Helper function to handle user interaction promises uniformly

@@ -11,7 +11,7 @@ import {
 import { type BasePromptValueInterface } from "@langchain/core/prompt_values";
 import { type BaseLanguageModelInput } from "@langchain/core/language_models/base";
 
-import { FileBasedResponseCache } from "@editor-extensions/agentic";
+import { FileBasedResponseCache } from "../../../agentic/src";
 
 export function getCacheForModelProvider(
   enabled: boolean,
@@ -22,11 +22,13 @@ export function getCacheForModelProvider(
   return new FileBasedResponseCache<BaseLanguageModelInput, BaseMessage>(
     enabled,
     (data: BaseLanguageModelInput | BaseMessage) =>
-      isTracer ? prettyPrint(data) : JSON.stringify(serializeLLMMessages(data), null, 2),
+      isTracer
+        ? prettyPrint(data)
+        : JSON.stringify(serializeLLMMessages(data).map(sortKeys), null, 2),
     (data: string) => deserializeLLMMessages(data)[0],
     cacheDir,
     logger,
-    (input: BaseLanguageModelInput | BaseMessage) => hash(input),
+    (input: BaseLanguageModelInput | BaseMessage) => hashFilteredAndSorted(input),
   );
 }
 
@@ -68,24 +70,39 @@ export function serializeLLMMessages(data: BaseLanguageModelInput | BaseMessage)
   return [];
 }
 
-function hash(input: BaseLanguageModelInput | BaseMessage): string {
+export function hashFilteredAndSorted(input: BaseLanguageModelInput | BaseMessage): string {
   return createHash("sha256")
-    .update(JSON.stringify(serializeLLMMessages(input).map(filterFields)))
+    .update(JSON.stringify(serializeLLMMessages(input).map(filterFields).map(sortKeys)))
     .digest("hex")
     .slice(0, 16);
 }
 
-function filterFields<T>(obj: T): T {
+// Sort keys to ensure consistent hash
+export function sortKeys(obj: any): any {
   if (typeof obj !== "object" || obj === null) {
     return obj;
   }
   if (Array.isArray(obj)) {
-    return obj.map((item) => filterFields(item)) as T;
+    return obj.map(sortKeys);
   }
+  const sortedEntries = Object.entries(obj)
+    .sort(([keyA], [keyB]) => keyA.localeCompare(keyB))
+    .map(([key, val]) => [key, sortKeys(val)]);
+  return Object.fromEntries(sortedEntries);
+}
+
+// Remove fields that change between runs and cause cache misses
+export function filterFields<T>(obj: T): T {
+  if (typeof obj !== "object" || obj === null) {
+    return obj;
+  }
+  if (Array.isArray(obj)) {
+    return obj.map(filterFields) as T;
+  }
+  const keysToRemove = ["created_at", "id", "tool_call_id"];
   const newObj: { [key: string]: any } = {};
   for (const key in obj) {
     if (Object.prototype.hasOwnProperty.call(obj, key)) {
-      const keysToRemove = ["created_at", "id", "tool_call_id"];
       if (keysToRemove.includes(key)) {
         continue;
       }

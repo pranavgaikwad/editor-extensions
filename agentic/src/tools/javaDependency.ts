@@ -59,6 +59,8 @@ export class JavaDependencyTools {
         const cacheSubDir = "searchFqdn";
         const cachedResponse = await this.cache.get(cacheKey, {
           cacheSubDir,
+          inputFileExt: ".json",
+          outputFileExt: "",
         });
         if (cachedResponse) {
           return cachedResponse;
