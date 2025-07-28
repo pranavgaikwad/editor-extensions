@@ -103,7 +103,8 @@ export class BaseModelProvider implements KaiModelProvider {
       });
       this.tracer.set(input, result, {
         cacheSubDir: options.cacheKey,
-        fileExt: "",
+        inputFileExt: "",
+        outputFileExt: "",
       });
     }
     return result;
@@ -167,7 +168,8 @@ export class BaseModelProvider implements KaiModelProvider {
             });
             await tracer.set(input, accumulatedResponse, {
               cacheSubDir: options.cacheKey,
-              fileExt: "",
+              inputFileExt: "",
+              outputFileExt: "",
             });
           }
           controller.close();

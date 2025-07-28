@@ -208,24 +208,30 @@ export class KaiInteractiveWorkflow
     }
 
     const incidentsByUris: Array<{ uri: string; incidents: EnhancedIncident[] }> =
-      input.incidents?.reduce(
-        (acc, incident) => {
-          const existingEntry = acc.find(
-            (entry: { uri: string; incidents: EnhancedIncident[] }) =>
-              entry.uri === fileUriToPath(incident.uri),
-          );
-          if (existingEntry) {
-            existingEntry.incidents.push(incident);
-          } else {
-            acc.push({
-              uri: fileUriToPath(incident.uri),
-              incidents: [incident],
-            });
-          }
-          return acc;
-        },
-        [] as Array<{ uri: string; incidents: EnhancedIncident[] }>,
-      ) ?? [];
+      input.incidents
+        ?.reduce(
+          (acc, incident) => {
+            const existingEntry = acc.find(
+              (entry: { uri: string; incidents: EnhancedIncident[] }) =>
+                entry.uri === fileUriToPath(incident.uri),
+            );
+            if (existingEntry) {
+              existingEntry.incidents.push(incident);
+            } else {
+              acc.push({
+                uri: fileUriToPath(incident.uri),
+                incidents: [incident],
+              });
+            }
+            return acc;
+          },
+          [] as Array<{ uri: string; incidents: EnhancedIncident[] }>,
+        )
+        ?.sort((a, b) => a.uri.localeCompare(b.uri))
+        ?.map((entry) => ({
+          ...entry,
+          incidents: entry.incidents.sort((a, b) => a.uri.localeCompare(b.uri)),
+        })) ?? [];
 
     const cacheSubDir = this.createIncidentsHash(incidentsByUris);
     this.logger.debug(`Using cache directory '${cacheSubDir}' for this run`);

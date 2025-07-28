@@ -236,7 +236,7 @@ ${state.inputFileContent}
 ## Issues
 ${state.inputIncidents
   .map((incident) => {
-    return `* ${incident.lineNumber}: ${incident.message}`;
+    return `* ${incident.message}`;
   })
   .join("\n")}
 ${hints.length > 0 ? `\n## Hints\n${hints.map((hint) => `* ${hint.hint}`).join("\n")}` : ""}

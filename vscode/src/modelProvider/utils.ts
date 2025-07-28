@@ -1,3 +1,4 @@
+import { createHash } from "crypto";
 import * as winston from "winston";
 import {
   BaseMessage,
@@ -7,9 +8,10 @@ import {
   mapStoredMessagesToChatMessages,
   type StoredMessage,
 } from "@langchain/core/messages";
-import { FileBasedResponseCache } from "@editor-extensions/agentic";
 import { type BasePromptValueInterface } from "@langchain/core/prompt_values";
 import { type BaseLanguageModelInput } from "@langchain/core/language_models/base";
+
+import { FileBasedResponseCache } from "@editor-extensions/agentic";
 
 export function getCacheForModelProvider(
   enabled: boolean,
@@ -20,10 +22,11 @@ export function getCacheForModelProvider(
   return new FileBasedResponseCache<BaseLanguageModelInput, BaseMessage>(
     enabled,
     (data: BaseLanguageModelInput | BaseMessage) =>
-      isTracer ? prettyPrint(data) : JSON.stringify(serializeLLMMessages(data)),
+      isTracer ? prettyPrint(data) : JSON.stringify(serializeLLMMessages(data), null, 2),
     (data: string) => deserializeLLMMessages(data)[0],
     cacheDir,
     logger,
+    (input: BaseLanguageModelInput | BaseMessage) => hash(input),
   );
 }
 
@@ -62,8 +65,34 @@ export function serializeLLMMessages(data: BaseLanguageModelInput | BaseMessage)
         .filter(Boolean),
     );
   }
-  // we dont support other types of messages
-  throw new Error("Unable to serialize data");
+  return [];
+}
+
+function hash(input: BaseLanguageModelInput | BaseMessage): string {
+  return createHash("sha256")
+    .update(JSON.stringify(serializeLLMMessages(input).map(filterFields)))
+    .digest("hex")
+    .slice(0, 16);
+}
+
+function filterFields<T>(obj: T): T {
+  if (typeof obj !== "object" || obj === null) {
+    return obj;
+  }
+  if (Array.isArray(obj)) {
+    return obj.map((item) => filterFields(item)) as T;
+  }
+  const newObj: { [key: string]: any } = {};
+  for (const key in obj) {
+    if (Object.prototype.hasOwnProperty.call(obj, key)) {
+      const keysToRemove = ["created_at", "id", "tool_call_id"];
+      if (keysToRemove.includes(key)) {
+        continue;
+      }
+      newObj[key] = filterFields((obj as any)[key]);
+    }
+  }
+  return newObj as T;
 }
 
 function isBasePromptValueInterface(data: unknown): data is BasePromptValueInterface {

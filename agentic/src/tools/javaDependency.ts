@@ -116,6 +116,8 @@ export class JavaDependencyTools {
         }
         await this.cache.set(cacheKey, response, {
           cacheSubDir,
+          inputFileExt: ".json",
+          outputFileExt: "",
         });
         return response;
       },

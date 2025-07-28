@@ -11,7 +11,8 @@ export interface CacheFilePaths {
 
 export interface FileBasedCacheOptions {
   cacheSubDir?: string;
-  fileExt?: string;
+  inputFileExt?: string;
+  outputFileExt?: string;
 }
 
 /**
@@ -33,6 +34,7 @@ export class FileBasedResponseCache<K, V>
     private readonly deserializeFunction: (input: string) => V,
     private readonly cacheDir?: string,
     private readonly logger?: winston.Logger,
+    private readonly hashFunction?: (input: K | V) => string,
   ) {
     this.enabled = enabled;
   }
@@ -45,8 +47,8 @@ export class FileBasedResponseCache<K, V>
     const cachePath = pathlib.join(
       this.cacheDir ?? "",
       opts?.cacheSubDir ?? "",
-      this.hash(input),
-      `output${opts?.fileExt ?? ".json"}`,
+      this.hashFunction ? this.hashFunction(input) : this.hash(input),
+      `output${opts?.outputFileExt ?? ".json"}`,
     );
     try {
       const stat = await fs.stat(cachePath);
@@ -69,12 +71,15 @@ export class FileBasedResponseCache<K, V>
     const cacheBasePath = pathlib.join(
       this.cacheDir ?? "",
       opts?.cacheSubDir ?? "",
-      this.hash(input),
+      this.hashFunction ? this.hashFunction(input) : this.hash(input),
     );
 
     try {
-      const inputRecordPath = pathlib.join(cacheBasePath, `input${opts?.fileExt ?? ".json"}`);
-      const outputRecordPath = pathlib.join(cacheBasePath, `output${opts?.fileExt ?? ".json"}`);
+      const inputRecordPath = pathlib.join(cacheBasePath, `input${opts?.inputFileExt ?? ".json"}`);
+      const outputRecordPath = pathlib.join(
+        cacheBasePath,
+        `output${opts?.outputFileExt ?? ".json"}`,
+      );
       await fs.mkdir(cacheBasePath, { recursive: true });
       await fs.writeFile(inputRecordPath, this.serializeFunction(input));
       await fs.writeFile(outputRecordPath, this.serializeFunction(value));
@@ -90,10 +95,7 @@ export class FileBasedResponseCache<K, V>
   }
 
   private hash(input: K): string {
-    return createHash("sha256")
-      .update(JSON.stringify(this.serializeFunction(input)))
-      .digest("hex")
-      .slice(0, 16);
+    return createHash("sha256").update(this.serializeFunction(input)).digest("hex").slice(0, 16);
   }
 
   async invalidate(input: K, opts?: FileBasedCacheOptions): Promise<void> {

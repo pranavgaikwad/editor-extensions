@@ -1,6 +1,7 @@
 import * as vscode from "vscode";
 import * as crypto from "crypto";
-import { Task, TaskManager, TasksHistory } from "src/taskManager/types";
+import { isUriIgnored } from "../paths";
+import { Task, TaskManager, TasksHistory } from "./types";
 
 export class DiagnosticTask implements Task {
   private id: string;
@@ -188,7 +189,9 @@ export class DiagnosticTaskManager implements TaskManager {
     this.history.addResolvedTasks(resolvedTasks);
     this.history.addUnresolvedTasks(unresolvedTasks);
     this.currentTasks = newDiagnostics;
-    return newTasks.filter((t) => !this.history.frequentlyUnresolved(t));
+    return newTasks
+      .filter((t) => !isUriIgnored(t.getUri()))
+      .filter((t) => !this.history.frequentlyUnresolved(t));
   }
 
   private getCurrentDiagnostics(): Array<DiagnosticTask | AnalysisDiagnosticTask> {
