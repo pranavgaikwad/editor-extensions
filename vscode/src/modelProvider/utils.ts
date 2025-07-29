@@ -8,10 +8,9 @@ import {
   mapStoredMessagesToChatMessages,
   type StoredMessage,
 } from "@langchain/core/messages";
+import { FileBasedResponseCache } from "@editor-extensions/agentic";
 import { type BasePromptValueInterface } from "@langchain/core/prompt_values";
 import { type BaseLanguageModelInput } from "@langchain/core/language_models/base";
-
-import { FileBasedResponseCache } from "../../../agentic/src";
 
 export function getCacheForModelProvider(
   enabled: boolean,
