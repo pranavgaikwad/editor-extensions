@@ -126,7 +126,7 @@ export class DiagnosticTaskHistory implements TasksHistory {
   }
 
   addResolvedTasks(tasks: Array<DiagnosticTask | AnalysisDiagnosticTask>): void {
-    this.resolvedTasks.concat(tasks);
+    this.resolvedTasks = this.resolvedTasks.concat(tasks);
     // remove from unresolved too
     tasks.forEach((t) => {
       if (this.unresolvedTasksCounter.has(t.getId())) {

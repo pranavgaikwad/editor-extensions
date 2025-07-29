@@ -32,11 +32,21 @@ export function getCacheForModelProvider(
 }
 
 export function deserializeLLMMessages(data: string): BaseMessage[] {
-  const rawParsed = JSON.parse(data);
-  if (Array.isArray(rawParsed) && (rawParsed as StoredMessage[])) {
-    return mapStoredMessagesToChatMessages(rawParsed);
+  try {
+    const rawParsed = JSON.parse(data);
+    if (Array.isArray(rawParsed)) {
+      const result = mapStoredMessagesToChatMessages(rawParsed as StoredMessage[]);
+      if (result.length === 0) {
+        throw new Error("Expected at least one message in the cache file");
+      }
+      return result;
+    }
+    throw new Error("Expected an array of messages in the cache file");
+  } catch (error) {
+    throw new Error(
+      `Unable to deserialize cached data: ${error instanceof Error ? error.message : "Invalid JSON"}`,
+    );
   }
-  throw new Error("Unable to deserialize data");
 }
 
 export function serializeLLMMessages(data: BaseLanguageModelInput | BaseMessage): StoredMessage[] {
