@@ -49,7 +49,6 @@ import {
   updateGetSolutionMaxPriority,
   getConfigAgentMode,
   getConfigSuperAgentMode,
-  getCacheDir,
 } from "./utilities/configuration";
 import { runPartialAnalysis } from "./analysis";
 import { fixGroupOfIncidents, IncidentTypeItem } from "./issueView";
@@ -245,14 +244,15 @@ const commandsMap: (
         try {
           const agentModeEnabled = getConfigAgentMode();
 
-          await workflow.run({
+          const input: KaiInteractiveWorkflowInput = {
             incidents,
             migrationHint: profileName,
             programmingLanguage: "Java",
             enableAdditionalInformation: agentModeEnabled,
             enableDiagnostics: getConfigSuperAgentMode(),
-            cacheDir: getCacheDir(state.data.workspaceRoot) || undefined,
-          } as KaiInteractiveWorkflowInput);
+          };
+
+          await workflow.run(input);
 
           // Wait for all message processing to complete before proceeding
           // This is critical for non-agentic mode where ModifiedFile messages
