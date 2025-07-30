@@ -42,10 +42,6 @@ import {
 } from "./diffView";
 import {
   updateAnalyzerPath,
-  updateKaiRpcServerPath,
-  updateGetSolutionMaxDepth,
-  updateGetSolutionMaxIterations,
-  updateGetSolutionMaxPriority,
   getConfigAgentMode,
 } from "./utilities/configuration";
 import { runPartialAnalysis } from "./analysis";
@@ -568,42 +564,6 @@ const commandsMap: (
         window.showInformationMessage("No analyzer binary selected.");
       }
     },
-    "konveyor.overrideKaiRpcServerBinaries": async () => {
-      const options: OpenDialogOptions = {
-        canSelectMany: false,
-        openLabel: "Select Rpc Server Binary",
-        filters: isWindows
-          ? {
-              "Executable Files": ["exe"],
-              "All Files": ["*"],
-            }
-          : {
-              "All Files": ["*"],
-            },
-      };
-
-      const fileUri = await window.showOpenDialog(options);
-      if (fileUri && fileUri[0]) {
-        const filePath = fileUri[0].fsPath;
-
-        const isExecutable = await checkIfExecutable(filePath);
-        if (!isExecutable) {
-          window.showErrorMessage(
-            `The selected file "${filePath}" is not executable. Please select a valid executable file.`,
-          );
-          return;
-        }
-
-        // Update the user settings
-        await updateKaiRpcServerPath(filePath);
-
-        window.showInformationMessage(`Rpc server binary path updated to: ${filePath}`);
-      } else {
-        // Reset the setting to undefined or remove it
-        await updateKaiRpcServerPath(undefined);
-        window.showInformationMessage("No Kai rpc-server binary selected.");
-      }
-    },
     "konveyor.modelProviderSettingsOpen": async () => {
       const settingsDocument = await workspace.openTextDocument(paths().settingsYaml);
       window.showTextDocument(settingsDocument);
@@ -650,57 +610,6 @@ const commandsMap: (
     "konveyor.diffView.applySelection": applyBlock,
     "konveyor.diffView.applySelectionInline": applyBlock,
     "konveyor.partialAnalysis": async (filePaths: Uri[]) => runPartialAnalysis(state, filePaths),
-    "konveyor.configureGetSolutionParams": async () => {
-      const maxPriorityInput = await window.showInputBox({
-        prompt: "Enter max_priority for getSolution",
-        placeHolder: "0",
-        validateInput: (value) => {
-          return isNaN(Number(value)) ? "Please enter a valid number" : null;
-        },
-      });
-
-      if (maxPriorityInput === undefined) {
-        return;
-      }
-
-      const maxPriority = Number(maxPriorityInput);
-
-      const maxDepthInput = await window.showInputBox({
-        prompt: "Enter max_depth for getSolution",
-        placeHolder: "0",
-        validateInput: (value) => {
-          return isNaN(Number(value)) ? "Please enter a valid number" : null;
-        },
-      });
-
-      if (maxDepthInput === undefined) {
-        return;
-      }
-
-      const maxDepth = Number(maxDepthInput);
-
-      const maxIterationsInput = await window.showInputBox({
-        prompt: "Enter max_iterations for getSolution",
-        placeHolder: "1",
-        validateInput: (value) => {
-          return isNaN(Number(value)) ? "Please enter a valid number" : null;
-        },
-      });
-
-      if (maxIterationsInput === undefined) {
-        return;
-      }
-
-      const maxIterations = Number(maxIterationsInput);
-
-      await updateGetSolutionMaxPriority(maxPriority);
-      await updateGetSolutionMaxDepth(maxDepth);
-      await updateGetSolutionMaxIterations(maxIterations);
-
-      window.showInformationMessage(
-        `getSolution parameters updated: max_priority=${maxPriority}, max_depth=${maxDepth}, max_iterations=${maxIterations}`,
-      );
-    },
   };
 };
 

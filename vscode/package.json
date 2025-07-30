@@ -114,12 +114,6 @@
         "icon": "$(gear)"
       },
       {
-        "command": "konveyor.overrideKaiRpcServerBinaries",
-        "title": "Override Rpc Server Binary",
-        "category": "Konveyor",
-        "icon": "$(gear)"
-      },
-      {
         "command": "konveyor.configureCustomRules",
         "title": "Configure Custom Rules",
         "category": "Konveyor",
@@ -264,12 +258,6 @@
         "icon": "$(arrow-left)",
         "category": "diffEditor",
         "title": "Apply Selection"
-      },
-      {
-        "command": "konveyor.configureGetSolutionParams",
-        "title": "Configure getSolution Parameters",
-        "category": "Konveyor",
-        "icon": "$(gear)"
       }
     ],
     "submenus": [
