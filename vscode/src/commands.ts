@@ -40,10 +40,7 @@ import {
   discardFile,
   applyBlock,
 } from "./diffView";
-import {
-  updateAnalyzerPath,
-  getConfigAgentMode,
-} from "./utilities/configuration";
+import { updateAnalyzerPath, getConfigAgentMode } from "./utilities/configuration";
 import { runPartialAnalysis } from "./analysis";
 import { fixGroupOfIncidents, IncidentTypeItem } from "./issueView";
 import { paths } from "./paths";
