@@ -26,7 +26,6 @@ import { ExtensionPaths, ensurePaths, paths } from "./paths";
 import { copySampleProviderSettings } from "./utilities/fileUtils";
 import {
   getExcludedDiagnosticSources,
-  getConfigSolutionMaxEffortLevel,
   getConfigSolutionServerEnabled,
   getConfigSolutionServerUrl,
   updateConfigErrors,
@@ -77,7 +76,6 @@ class VsCodeExtension {
         workspaceRoot: paths.workspaceRepo.toString(true),
         chatMessages: [],
         solutionState: "none",
-        solutionEffort: getConfigSolutionMaxEffortLevel(),
         solutionServerEnabled: getConfigSolutionServerEnabled(),
         configErrors: [],
         activeProfileId: "",
@@ -296,15 +294,11 @@ class VsCodeExtension {
 
           if (event.affectsConfiguration("konveyor.kai.getSolutionMaxEffort")) {
             this.state.logger.info("Effort modified!");
-            const effort = getConfigSolutionMaxEffortLevel();
-            this.state.mutateData((draft) => {
-              draft.solutionEffort = effort;
-            });
           }
           if (event.affectsConfiguration("konveyor.kai.agentMode")) {
             const agentMode = getConfigAgentMode();
             this.state.mutateData((draft) => {
-              (draft as any).isAgentMode = agentMode;
+              draft.isAgentMode = agentMode;
             });
           }
 

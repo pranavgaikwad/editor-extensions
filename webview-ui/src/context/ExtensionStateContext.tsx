@@ -19,7 +19,6 @@ const defaultState: ExtensionData = {
   workspaceRoot: "/",
   chatMessages: [],
   solutionState: "none",
-  solutionEffort: "Low",
   solutionServerEnabled: false,
   configErrors: [],
   profiles: [],
