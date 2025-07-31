@@ -117,9 +117,7 @@ export const getSuccessRate = (): WebviewAction<WebviewActionType, unknown> => (
   payload: {},
 });
 
-export const toggleAgentMode = (
-  enabled: boolean,
-): WebviewAction<WebviewActionType, { enabled: boolean }> => ({
+export const toggleAgentMode = (): WebviewAction<WebviewActionType, unknown> => ({
   type: "TOGGLE_AGENT_MODE",
-  payload: { enabled },
+  payload: {},
 });

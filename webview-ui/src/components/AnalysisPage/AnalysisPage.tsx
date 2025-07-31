@@ -108,7 +108,7 @@ const AnalysisPage: React.FC = () => {
   const handleServerToggle = () => dispatch(serverRunning ? stopServer() : startServer());
 
   const handleAgentModeToggle = () => {
-    dispatch(toggleAgentMode(!state.isAgentMode));
+    dispatch(toggleAgentMode());
   };
 
   const panelContent = (
