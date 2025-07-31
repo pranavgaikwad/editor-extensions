@@ -1,5 +1,6 @@
 import * as vscode from "vscode";
 import * as pathlib from "path";
+import { fileURLToPath } from "url";
 import { KONVEYOR_CONFIG_KEY } from "./constants";
 import { AnalysisProfile, createConfigError, ExtensionData } from "@editor-extensions/shared";
 
