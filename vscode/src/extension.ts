@@ -45,6 +45,7 @@ import { ParsedModelConfig } from "./modelProvider/types";
 import { getModelProviderFromConfig, parseModelConfig } from "./modelProvider";
 import winston from "winston";
 import { OutputChannelTransport } from "winston-transport-vscode";
+import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 
 class VsCodeExtension {
   private state: ExtensionState;
@@ -192,6 +193,11 @@ class VsCodeExtension {
         },
       },
       modelProvider: undefined,
+      mcpServer: new McpServer({
+        name: "Konveyor AI",
+        version: "0.0.1",
+        title: "Kai MCP Server",
+      }),
     };
   }
 
@@ -491,6 +497,17 @@ class VsCodeExtension {
       return configError;
     }
     return undefined;
+  }
+
+  private async initializeMcpServer(): Promise<void> {
+    await vscode.commands.executeCommand("konveyor.startServer");
+    await vscode.commands.executeCommand("konveyor.runAnalysis");
+    // tool to get list of files with issues
+    // tool to get issues in a given file
+    // tool to get list of new issues
+    // tool to get list of new issues since last call
+    // tool to reset issues
+    // register resource to get all the files that have issues
   }
 
   public async dispose() {

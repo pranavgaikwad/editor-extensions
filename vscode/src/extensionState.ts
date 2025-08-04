@@ -15,6 +15,7 @@ import { MemFS } from "./data/fileSystemProvider";
 import { KonveyorFileModel } from "./diffView/fileModel";
 import { EventEmitter } from "events";
 import winston from "winston";
+import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 
 export interface ExtensionState {
   analyzerClient: AnalyzerClient;
@@ -50,4 +51,5 @@ export interface ExtensionState {
   currentTaskManagerIterations: number;
   logger: winston.Logger;
   modelProvider: KaiModelProvider | undefined;
+  mcpServer: McpServer | undefined;
 }
