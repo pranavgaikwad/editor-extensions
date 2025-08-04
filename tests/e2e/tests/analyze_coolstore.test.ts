@@ -97,6 +97,16 @@ providers.forEach((config) => {
       }
     });
 
+    // this test uses cached data, and only ensures that the agent mode flow works
+    test('Fix JMS Topic issue with agent mode enabled (offline)', async () => {
+      test.setTimeout(3600000);
+      await vscodeApp.waitDefault();
+      await vscodeApp.runAnalysis();
+      const analysisView = await vscodeApp.getView(KAIViews.analysisView);
+      await vscodeApp.searchViolation('JMS Topic');
+      await new Promise((resolve) => setTimeout(resolve, 60000));
+    });
+
     test.afterEach(async () => {
       if (test.info().status !== test.info().expectedStatus) {
         allOk = false;
