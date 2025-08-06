@@ -1,9 +1,12 @@
-import { _electron as electron, FrameLocator } from 'playwright';
-import { execSync } from 'child_process';
-import { cleanupRepo, generateRandomString, getOSInfo } from '../utilities/utils';
+import * as fs from 'fs';
 import * as path from 'path';
+import { execSync } from 'child_process';
+import { _electron as electron, FrameLocator } from 'playwright';
+import { ElectronApplication, expect, Page } from '@playwright/test';
+
+import { createZip, extractZip, mergeZips } from '../utilities/archive';
+import { cleanupRepo, generateRandomString, getOSInfo } from '../utilities/utils';
 import { LeftBarItems } from '../enums/left-bar-items.enum';
-import { expect } from '@playwright/test';
 import { DEFAULT_PROVIDER } from '../fixtures/provider-configs.fixture';
 import { KAIViews } from '../enums/views.enum';
 import { TEST_DATA_DIR } from '../utilities/consts';
@@ -12,6 +15,14 @@ import { installExtension } from '../utilities/vscode-commands.utils';
 import { FixTypes } from '../enums/fix-types.enum';
 
 export class VSCode extends BasePage {
+  constructor(
+    app: ElectronApplication,
+    window: Page,
+    private readonly repoDir?: string
+  ) {
+    super(app, window);
+  }
+
   public static async open(repoUrl?: string, repoDir?: string) {
     /**
      * user-data-dir is passed to force opening a new instance avoiding the process to couple with an existing vscode instance
@@ -66,7 +77,7 @@ export class VSCode extends BasePage {
 
     const window = await vscodeApp.firstWindow({ timeout: 60000 });
     console.log('VSCode opened');
-    return new VSCode(vscodeApp, window);
+    return new VSCode(vscodeApp, window, repoDir);
   }
 
   /**
@@ -272,5 +283,94 @@ export class VSCode extends BasePage {
     await this.searchViolation(searchTerm);
     await analysisView.locator('div.pf-v6-c-card__header-toggle').nth(0).click();
     await analysisView.locator('button#get-solution-button').nth(fixType).click();
+  }
+
+  /**
+   * Unzips all test data into workspace .vscode/ directory, deletes the zip files if cleanup is true
+   */
+  public async ensureLLMCache(cleanup: boolean = false): Promise<void> {
+    try {
+      const wspacePath = this.llmCachePaths().workspacePath;
+      const storedPath = this.llmCachePaths().storedPath;
+      if (cleanup) {
+        if (fs.existsSync(wspacePath)) {
+          fs.rmSync(wspacePath, { recursive: true, force: true });
+        }
+        return;
+      }
+      if (!fs.existsSync(wspacePath)) {
+        fs.mkdirSync(wspacePath, { recursive: true });
+      }
+      if (!fs.existsSync(storedPath)) {
+        return;
+      }
+      // move stored zip to workspace
+      await extractZip(storedPath, wspacePath);
+    } catch (error) {
+      console.error('Error unzipping test data:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Copies all newly generated LLM cache data into a zip file in the repo, merges with the existing data
+   * This will be used when we want to generate a new cache data
+   */
+  public async updateLLMCache() {
+    const newCacheZip = path.join(path.dirname(this.llmCachePaths().storedPath), 'new.zip');
+    await createZip(this.llmCachePaths().workspacePath, newCacheZip);
+    // move workspace zip to stored
+    if (fs.existsSync(this.llmCachePaths().storedPath)) {
+      console.log('Merging new cache zip with stored cache');
+      await mergeZips(
+        [newCacheZip, this.llmCachePaths().storedPath],
+        this.llmCachePaths().storedPath
+      );
+    } else {
+      console.log('Moving new cache zip to stored path');
+      fs.renameSync(newCacheZip, this.llmCachePaths().storedPath);
+      fs.renameSync(`${newCacheZip}.metadata`, `${this.llmCachePaths().storedPath}.metadata`);
+    }
+  }
+
+  private llmCachePaths(): {
+    storedPath: string; // this is where the data is checked-in in the repo
+    workspacePath: string; // this is where a workspace is expecting to find cached data
+  } {
+    return {
+      storedPath: path.join(__dirname, '..', '..', 'data', 'llm_cache.zip'),
+      workspacePath: path.join(this.repoDir ?? '', '.vscode', 'cache'),
+    };
+  }
+
+  /**
+   * Writes or updates the VSCode settings.json file to current workspace @ .vscode/settings.json
+   * @param settings - Key - value pair of settings to write or update, if a setting already exists, the new values will be merged
+   */
+  public async writeOrUpdateVSCodeSettings(settings: Record<string, any>): Promise<void> {
+    try {
+      const vscodeDir = path.join(this.repoDir ?? '', '.vscode');
+      const settingsPath = path.join(vscodeDir, 'settings.json');
+      if (!fs.existsSync(vscodeDir)) {
+        fs.mkdirSync(vscodeDir, { recursive: true });
+      }
+      let existingSettings: Record<string, any> = {};
+      if (fs.existsSync(settingsPath)) {
+        try {
+          const existingContent = fs.readFileSync(settingsPath, 'utf-8');
+          existingSettings = JSON.parse(existingContent);
+        } catch (parseError) {
+          console.warn(
+            `Failed to parse existing settings.json, starting with empty settings: ${parseError}`
+          );
+          existingSettings = {};
+        }
+      }
+      const mergedSettings = { ...existingSettings, ...settings };
+      fs.writeFileSync(settingsPath, JSON.stringify(mergedSettings, null, 2), 'utf-8');
+    } catch (error) {
+      console.error('Error writing VSCode settings:', error);
+      throw error;
+    }
   }
 }

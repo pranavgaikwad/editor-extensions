@@ -19,7 +19,20 @@ export const AWS_PROVIDER: ProviderConfig = {
   ].join('\n'),
 };
 
-export const OPENAI_PROVIDER: ProviderConfig = {
+export const OPENAI_GPT4O_PROVIDER: ProviderConfig = {
+  provider: LLMProviders.openAI,
+  model: 'gpt-4o',
+  config: [
+    'models:',
+    '  OpenAI: &active',
+    '    provider: "ChatOpenAI"',
+    '    args:',
+    '      model: "gpt-4o"',
+    'active: *active',
+  ].join('\n'),
+};
+
+export const OPENAI_GPT4OMINI_PROVIDER: ProviderConfig = {
   provider: LLMProviders.openAI,
   model: 'gpt-4o-mini',
   config: [
@@ -27,7 +40,7 @@ export const OPENAI_PROVIDER: ProviderConfig = {
     '  OpenAI: &active',
     '    provider: "ChatOpenAI"',
     '    args:',
-    '      model: "gpt-4o-mini"',
+    '      model: "gpt-4o"',
     'active: *active',
   ].join('\n'),
 };
@@ -47,10 +60,10 @@ export const PARASOL_PROVIDER: ProviderConfig = {
   ].join('\n'),
 };
 
-export const DEFAULT_PROVIDER = OPENAI_PROVIDER;
+export const DEFAULT_PROVIDER = OPENAI_GPT4O_PROVIDER;
 
 export const providerConfigs: ProviderConfig[] = [
   //PARASOL_PROVIDER,
   AWS_PROVIDER,
-  OPENAI_PROVIDER,
+  OPENAI_GPT4O_PROVIDER,
 ];
