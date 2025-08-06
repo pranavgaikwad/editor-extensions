@@ -12,10 +12,6 @@ export const AWS_PROVIDER: ProviderConfig = {
   config: [
     'models:',
     '  AmazonBedrock: &active',
-    '    environment:',
-    `      AWS_ACCESS_KEY_ID: "${process.env.AWS_ACCESS_KEY_ID}"`,
-    `      AWS_SECRET_ACCESS_KEY: "${process.env.AWS_SECRET_ACCESS_KEY}"`,
-    `      AWS_DEFAULT_REGION: "${process.env.AWS_DEFAULT_REGION}"`,
     '    provider: "ChatBedrock"',
     '    args:',
     '      model_id: "meta.llama3-70b-instruct-v1:0"',
@@ -29,8 +25,6 @@ export const OPENAI_PROVIDER: ProviderConfig = {
   config: [
     'models:',
     '  OpenAI: &active',
-    '    environment:',
-    `      OPENAI_API_KEY: "${process.env.OPENAI_API_KEY}"`,
     '    provider: "ChatOpenAI"',
     '    args:',
     '      model: "gpt-4o-mini"',
@@ -44,8 +38,6 @@ export const PARASOL_PROVIDER: ProviderConfig = {
   config: [
     'models:',
     '  parasols-maas-granite: &active',
-    '    environment:',
-    `      OPENAI_API_KEY: "${process.env.PARASOL_API_KEY}"`,
     '    provider: "ChatOpenAI"',
     '    args:',
     '      model: "granite-3-3-8b-instruct"',
