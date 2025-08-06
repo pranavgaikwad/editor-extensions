@@ -40,7 +40,12 @@ export class JavaDependencyTools {
       schema: z.object({
         artifactID: z.string().describe("Artifact ID of the dependency"),
         groupID: z.string().describe("Group ID of the dependency"),
-        version: z.string().describe("Version of the dependency").optional(),
+        version: z
+          .string()
+          .describe(
+            "Version of the dependency (optional). When not specified, latest version will be returned.",
+          )
+          .optional(),
       }),
       func: async ({
         artifactID,
