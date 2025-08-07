@@ -40,7 +40,7 @@ export const OPENAI_GPT4OMINI_PROVIDER: ProviderConfig = {
     '  OpenAI: &active',
     '    provider: "ChatOpenAI"',
     '    args:',
-    '      model: "gpt-4o"',
+    '      model: "gpt-4o-mini"',
     'active: *active',
   ].join('\n'),
 };
@@ -60,10 +60,10 @@ export const PARASOL_PROVIDER: ProviderConfig = {
   ].join('\n'),
 };
 
-export const DEFAULT_PROVIDER = OPENAI_GPT4O_PROVIDER;
+export const DEFAULT_PROVIDER = OPENAI_GPT4OMINI_PROVIDER;
 
 export const providerConfigs: ProviderConfig[] = [
   //PARASOL_PROVIDER,
   AWS_PROVIDER,
-  OPENAI_GPT4O_PROVIDER,
+  OPENAI_GPT4OMINI_PROVIDER,
 ];

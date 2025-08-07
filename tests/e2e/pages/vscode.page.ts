@@ -4,7 +4,7 @@ import { execSync } from 'child_process';
 import { _electron as electron, FrameLocator } from 'playwright';
 import { ElectronApplication, expect, Page } from '@playwright/test';
 
-import { createZip, extractZip, mergeZips } from '../utilities/archive';
+import { createZip, extractZip } from '../utilities/archive';
 import { cleanupRepo, generateRandomString, getOSInfo } from '../utilities/utils';
 import { LeftBarItems } from '../enums/left-bar-items.enum';
 import { DEFAULT_PROVIDER } from '../fixtures/provider-configs.fixture';
@@ -318,16 +318,19 @@ export class VSCode extends BasePage {
    */
   public async updateLLMCache() {
     const newCacheZip = path.join(path.dirname(this.llmCachePaths().storedPath), 'new.zip');
-    await createZip(this.llmCachePaths().workspacePath, newCacheZip);
     // move workspace zip to stored
     if (fs.existsSync(this.llmCachePaths().storedPath)) {
-      console.log('Merging new cache zip with stored cache');
-      await mergeZips(
-        [newCacheZip, this.llmCachePaths().storedPath],
+      console.log('Merging new cache with stored cache');
+      await createZip(
+        this.llmCachePaths().workspacePath,
+        newCacheZip,
         this.llmCachePaths().storedPath
       );
+      fs.renameSync(newCacheZip, this.llmCachePaths().storedPath);
+      fs.renameSync(`${newCacheZip}.metadata`, `${this.llmCachePaths().storedPath}.metadata`);
     } else {
       console.log('Moving new cache zip to stored path');
+      await createZip(this.llmCachePaths().workspacePath, newCacheZip);
       fs.renameSync(newCacheZip, this.llmCachePaths().storedPath);
       fs.renameSync(`${newCacheZip}.metadata`, `${this.llmCachePaths().storedPath}.metadata`);
     }
