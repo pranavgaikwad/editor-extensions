@@ -6,6 +6,7 @@ import { getOSInfo, getRepoName, providerIdentifier } from '../utilities/utils';
 import {
   DEFAULT_PROVIDER,
   OPENAI_GPT4O_PROVIDER,
+  OPENAI_GPT4OMINI_PROVIDER,
   providerConfigs,
 } from '../fixtures/provider-configs.fixture';
 import path from 'path';
@@ -46,7 +47,7 @@ providers.forEach((config) => {
       });
     });
 
-    test.skip('Analyze coolstore app', async () => {
+    test('Analyze coolstore app', async () => {
       test.setTimeout(3600000);
       await vscodeApp.waitDefault();
       await vscodeApp.runAnalysis();
@@ -69,7 +70,7 @@ providers.forEach((config) => {
       });
     });
 
-    test.skip('Fix Issue with default (Low) effort', async () => {
+    test('Fix Issue with default (Low) effort', async () => {
       test.setTimeout(3600000);
       await vscodeApp.openAnalysisView();
       const analysisView = await vscodeApp.getView(KAIViews.analysisView);
@@ -88,7 +89,7 @@ providers.forEach((config) => {
       ).toBeVisible({ timeout: 60000 });
     });
 
-    test.skip('Fix all issues with default (Low) effort', async () => {
+    test('Fix all issues with default (Low) effort', async () => {
       test.setTimeout(3600000);
       await vscodeApp.openAnalysisView();
       const analysisView = await vscodeApp.getView(KAIViews.analysisView);
@@ -111,10 +112,13 @@ providers.forEach((config) => {
     // this test uses cached data, and only ensures that the agent mode flow works
     test('Fix JMS Topic issue with agent mode enabled (offline)', async () => {
       // NOTE: update this list when you create cache for a new provider
-      const cacheAvailableFor = [providerIdentifier(OPENAI_GPT4O_PROVIDER)];
-      // only run this test when either one of the following is true:
-      // 1. we want to create new cache
-      // 2. we have a valid cache for this provider
+      const cacheAvailableFor = [
+        providerIdentifier(OPENAI_GPT4O_PROVIDER),
+        providerIdentifier(OPENAI_GPT4OMINI_PROVIDER),
+      ];
+      // only run this test when either one is true:
+      // 1. we are creating new cache
+      // 2. we have cache checked-in for this provider
       test.skip(
         !(process.env.UPDATE_LLM_CACHE || cacheAvailableFor.includes(providerIdentifier(config))),
         `Skipping as either cache is not available for provider ${config.provider} or UPDATE_LLM_CACHE is not set`

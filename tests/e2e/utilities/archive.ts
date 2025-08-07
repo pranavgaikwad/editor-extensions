@@ -7,9 +7,9 @@ export async function extractZip(zipPath: string, destDir: string): Promise<void
   new AdmZip(zipPath).extractAllTo(destDir, true);
 }
 
-export async function createZip(sourceDir: string, outputZip: string) {
+export async function createZip(sourceDir: string, outputZip: string, sourceZip?: string) {
   const tree = createDirectoryTree(sourceDir);
-  const newZip = new AdmZip();
+  const newZip = sourceZip ? new AdmZip(sourceZip) : new AdmZip();
   const addDirContentsToZip = (zip: AdmZip, dir: string, zipRootPath: string = '') => {
     const items = fs.readdirSync(dir);
     for (const item of items) {
@@ -28,24 +28,6 @@ export async function createZip(sourceDir: string, outputZip: string) {
   fs.writeFileSync(`${outputZip}.metadata`, `SHA: ${sha256}\nTree:\n${tree}\n`, 'utf-8');
 }
 
-export async function mergeZips(zipPaths: string[], outputZip: string): Promise<void> {
-  const tempDir = pathlib.join(__dirname, 'temp_zip_merge');
-  const mergedDir = pathlib.join(tempDir, 'merged');
-  fs.rmSync(tempDir, { recursive: true, force: true });
-  fs.mkdirSync(tempDir, { recursive: true });
-  fs.mkdirSync(mergedDir, { recursive: true });
-  for (let i = 0; i < zipPaths.length; i++) {
-    const extractTo = pathlib.join(tempDir, `src_${i}`);
-    await extractZip(zipPaths[i], extractTo);
-    fs.cpSync(extractTo, mergedDir, { recursive: true });
-  }
-  await createZip(mergedDir, pathlib.join(tempDir, 'merged.zip'));
-  fs.renameSync(pathlib.join(tempDir, 'merged.zip'), outputZip);
-  fs.renameSync(pathlib.join(tempDir, 'merged.zip.metadata'), `${outputZip}.metadata`);
-  fs.rmSync(tempDir, { recursive: true, force: true });
-  fs.rmSync(mergedDir, { recursive: true, force: true });
-}
-
 export async function createChecksumFile(zipPath: string): Promise<void> {
   const fileBuffer = fs.readFileSync(zipPath);
   const hash = crypto.createHash('sha256');
@@ -57,7 +39,7 @@ export async function createChecksumFile(zipPath: string): Promise<void> {
   fs.writeFileSync(checksumPath, checksumContent, 'utf-8');
 }
 
-export function createDirectoryTree(rootDir: string, maxDepth: number = 2): string {
+export function createDirectoryTree(rootDir: string, maxDepth: number = 4): string {
   const tree: string[] = [];
   function buildTree(dir: string, prefix: string = '', depth: number = 0): void {
     if (depth > maxDepth || !fs.existsSync(dir)) {
