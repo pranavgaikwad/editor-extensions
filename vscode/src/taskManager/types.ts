@@ -29,4 +29,5 @@ export interface TaskManager {
 
   init(): void;
   getTasks(): TasksList;
+  reset(): void;
 }

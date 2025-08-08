@@ -227,4 +227,9 @@ export class DiagnosticTaskManager implements TaskManager {
 
     return filtered;
   }
+
+  reset(): void {
+    this.history.reset();
+    this.currentTasks = this.getCurrentDiagnostics();
+  }
 }
