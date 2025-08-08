@@ -300,6 +300,9 @@ class VsCodeExtension {
               .then((configError) => {
                 this.state.mutateData((draft) => {
                   if (configError) {
+                    draft.configErrors = draft.configErrors.filter(
+                      (e) => e.type !== configError.type,
+                    );
                     draft.configErrors.push(configError);
                   }
                 });
@@ -309,6 +312,9 @@ class VsCodeExtension {
                 this.state.mutateData((draft) => {
                   if (error) {
                     const configError = createConfigError.providerConnnectionFailed();
+                    draft.configErrors = draft.configErrors.filter(
+                      (e) => e.type !== configError.type,
+                    );
                     configError.error = error instanceof Error ? error.message : String(error);
                     draft.configErrors.push(configError);
                   }
