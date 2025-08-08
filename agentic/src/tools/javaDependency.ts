@@ -133,7 +133,7 @@ export class JavaDependencyTools {
       };
       const resp = await fetch(url, fetchOptions);
       if (resp.status !== 200) {
-        response = `Maven Central API returned code ${resp.status}: ${resp.text}`;
+        response = `Maven Central API returned code ${resp.status}: ${await resp.text()}`;
       } else {
         const output = (await resp.json()) as MavenApiResponse;
         const docs = output?.response?.docs.filter(Boolean);

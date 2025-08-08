@@ -3,11 +3,11 @@ import * as pathlib from 'path';
 import * as crypto from 'crypto';
 import AdmZip from 'adm-zip';
 
-export async function extractZip(zipPath: string, destDir: string): Promise<void> {
+export function extractZip(zipPath: string, destDir: string) {
   new AdmZip(zipPath).extractAllTo(destDir, true);
 }
 
-export async function createZip(sourceDir: string, outputZip: string, sourceZip?: string) {
+export function createZip(sourceDir: string, outputZip: string, sourceZip?: string) {
   const tree = createDirectoryTree(sourceDir);
   const newZip = sourceZip ? new AdmZip(sourceZip) : new AdmZip();
   const addDirContentsToZip = (zip: AdmZip, dir: string, zipRootPath: string = '') => {
@@ -26,17 +26,6 @@ export async function createZip(sourceDir: string, outputZip: string, sourceZip?
   newZip.writeZip(outputZip);
   const sha256 = createSha256Sum(outputZip);
   fs.writeFileSync(`${outputZip}.metadata`, `SHA: ${sha256}\nTree:\n${tree}\n`, 'utf-8');
-}
-
-export async function createChecksumFile(zipPath: string): Promise<void> {
-  const fileBuffer = fs.readFileSync(zipPath);
-  const hash = crypto.createHash('sha256');
-  hash.update(fileBuffer);
-  const sha256 = hash.digest('hex');
-  const timestamp = new Date().toISOString();
-  const checksumContent = `Timestamp: ${timestamp}\nSHA256: ${sha256}\n`;
-  const checksumPath = `${zipPath}.checksum`;
-  fs.writeFileSync(checksumPath, checksumContent, 'utf-8');
 }
 
 export function createDirectoryTree(rootDir: string, maxDepth: number = 4): string {

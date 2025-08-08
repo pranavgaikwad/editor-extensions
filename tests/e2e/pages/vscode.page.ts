@@ -321,16 +321,12 @@ export class VSCode extends BasePage {
     // move workspace zip to stored
     if (fs.existsSync(this.llmCachePaths().storedPath)) {
       console.log('Merging new cache with stored cache');
-      await createZip(
-        this.llmCachePaths().workspacePath,
-        newCacheZip,
-        this.llmCachePaths().storedPath
-      );
+      createZip(this.llmCachePaths().workspacePath, newCacheZip, this.llmCachePaths().storedPath);
       fs.renameSync(newCacheZip, this.llmCachePaths().storedPath);
       fs.renameSync(`${newCacheZip}.metadata`, `${this.llmCachePaths().storedPath}.metadata`);
     } else {
       console.log('Moving new cache zip to stored path');
-      await createZip(this.llmCachePaths().workspacePath, newCacheZip);
+      createZip(this.llmCachePaths().workspacePath, newCacheZip);
       fs.renameSync(newCacheZip, this.llmCachePaths().storedPath);
       fs.renameSync(`${newCacheZip}.metadata`, `${this.llmCachePaths().storedPath}.metadata`);
     }

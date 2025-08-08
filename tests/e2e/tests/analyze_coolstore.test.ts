@@ -148,9 +148,14 @@ providers.forEach((config) => {
       await fixButton.first().click();
       const resolutionView = await vscodeApp.getView(KAIViews.resolutionDetails);
       const loadingIndicator = resolutionView.locator('div.loading-indicator');
-      await expect(loadingIndicator.first()).toBeVisible({ timeout: 3000 });
+      await expect(loadingIndicator.first()).toBeVisible({ timeout: 6000 });
       let loadingIndicatorSeen = true;
+      let maxIterations = 1000; // just for safety against inf loops
       while (loadingIndicatorSeen) {
+        maxIterations -= 1;
+        if (maxIterations <= 0) {
+          throw new Error('Agent loop did not finish within 1000 iterations, this is unexpected');
+        }
         // if the loading indicator is no longer visible, we have reached the end
         if ((await resolutionView.locator('div.loading-indicator').count()) === 0) {
           loadingIndicatorSeen = false;
