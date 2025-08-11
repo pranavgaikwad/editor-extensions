@@ -45,7 +45,7 @@ import { ParsedModelConfig } from "./modelProvider/types";
 import { getModelProviderFromConfig, parseModelConfig } from "./modelProvider";
 import winston from "winston";
 import { OutputChannelTransport } from "winston-transport-vscode";
-import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { AnalysisApplication } from "./mcp/application";
 
 class VsCodeExtension {
   private state: ExtensionState;
@@ -193,11 +193,7 @@ class VsCodeExtension {
         },
       },
       modelProvider: undefined,
-      mcpServer: new McpServer({
-        name: "Konveyor AI",
-        version: "0.0.1",
-        title: "Kai MCP Server",
-      }),
+      mcpServer: undefined,
     };
   }
 
@@ -355,6 +351,7 @@ class VsCodeExtension {
       );
 
       vscode.commands.executeCommand("konveyor.loadResultsFromDataFolder");
+      await this.initializeMcpServer();
       this.state.logger.info("Extension initialized");
     } catch (error) {
       this.state.logger.error("Error initializing extension", error);
@@ -500,14 +497,13 @@ class VsCodeExtension {
   }
 
   private async initializeMcpServer(): Promise<void> {
-    await vscode.commands.executeCommand("konveyor.startServer");
-    await vscode.commands.executeCommand("konveyor.runAnalysis");
-    // tool to get list of files with issues
-    // tool to get issues in a given file
-    // tool to get list of new issues
-    // tool to get list of new issues since last call
-    // tool to reset issues
-    // register resource to get all the files that have issues
+    this.state.logger.info("initializeMcpServer: Starting MCP server initialization");
+    this.state.mcpServer = new AnalysisApplication(
+      {},
+      this.state.logger.child({ component: "analysisMcpServer" }),
+    );
+    await this.state.mcpServer.initMcp(this.state, this.state.data.workspaceRoot);
+    await this.state.mcpServer.start();
   }
 
   public async dispose() {

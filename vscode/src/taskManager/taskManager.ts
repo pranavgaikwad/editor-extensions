@@ -179,7 +179,7 @@ export class DiagnosticTaskManager implements TaskManager {
     }
   }
 
-  getTasks(): TasksList {
+  getKnockOnTasks(): TasksList {
     const tasksList: TasksList = {
       currentTasks: [],
       discardedTasks: [],
@@ -202,6 +202,10 @@ export class DiagnosticTaskManager implements TaskManager {
       .filter((t) => !this.history.frequentlyUnresolved(t));
     tasksList.discardedTasks = newTasks.filter((t) => this.history.frequentlyUnresolved(t));
     return tasksList;
+  }
+
+  getCurrentTasks(): Task[] {
+    return this.getCurrentDiagnostics();
   }
 
   private getCurrentDiagnostics(): Array<DiagnosticTask | AnalysisDiagnosticTask> {

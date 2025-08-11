@@ -7,6 +7,61 @@ export const registerAnalysisTrigger = (
   disposables: vscode.Disposable[],
   state: ExtensionState,
 ) => {
+  const watcher = vscode.workspace.createFileSystemWatcher(
+    new vscode.RelativePattern(vscode.workspace.workspaceFolders?.[0] ?? "", "**/*"),
+  );
+
+  watcher.onDidCreate(
+    async (uri) => {
+      try {
+        const doc = await vscode.workspace.openTextDocument(uri);
+        batchedAnalysisTrigger.notifyFileChanges({
+          path: uri,
+          content: doc.getText(),
+          saved: true,
+        });
+      } catch (error) {
+        console.error("Error opening text document:", error);
+      }
+    },
+    undefined,
+    disposables,
+  );
+
+  watcher.onDidChange(
+    async (uri) => {
+      try {
+        const doc = await vscode.workspace.openTextDocument(uri);
+        batchedAnalysisTrigger.notifyFileChanges({
+          path: uri,
+          content: doc.getText(),
+          saved: true,
+        });
+      } catch (error) {
+        console.error("Error opening text document:", error);
+      }
+    },
+    undefined,
+    disposables,
+  );
+
+  watcher.onDidDelete(
+    async (uri) => {
+      try {
+        const doc = await vscode.workspace.openTextDocument(uri);
+        batchedAnalysisTrigger.notifyFileChanges({
+          path: uri,
+          content: doc.getText(),
+          saved: true,
+        });
+      } catch (error) {
+        console.error("Error opening text document:", error);
+      }
+    },
+    undefined,
+    disposables,
+  );
+
   const batchedAnalysisTrigger = new BatchedAnalysisTrigger(state);
 
   vscode.workspace.onDidRenameFiles(

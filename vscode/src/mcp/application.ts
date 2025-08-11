@@ -23,12 +23,14 @@ export interface AnalysisSession {
 export class AnalysisApplication {
   private app: Application;
   private server: Server | null = null;
-  private logger: winston.Logger;
   private config: Required<AnalysisApplicationConfig>;
   private isShuttingDown = false;
   private sessions: Map<string, AnalysisSession>;
 
-  constructor(config: AnalysisApplicationConfig = {}, logger?: winston.Logger) {
+  constructor(
+    config: AnalysisApplicationConfig = {},
+    private readonly logger: winston.Logger,
+  ) {
     this.config = {
       port: config.port ?? 3000,
       host: config.host ?? "localhost",
@@ -36,21 +38,14 @@ export class AnalysisApplication {
       requestTimeout: config.requestTimeout ?? 1200000,
     };
 
-    this.logger =
-      logger ??
-      winston.createLogger({
-        level: "info",
-        format: winston.format.combine(winston.format.timestamp(), winston.format.json()),
-        transports: [new winston.transports.Console()],
-      });
-
     this.sessions = new Map<string, AnalysisSession>();
     this.app = express();
+    this.app.use(express.json());
     this.setupMiddleware();
-    this.setupErrorHandling();
   }
 
   public async initMcp(state: ExtensionState, workspaceDir: string): Promise<void> {
+    this.logger.debug(`Initializing MCP server with workspace dir '${workspaceDir}'`);
     this.app.post("/mcp", async (req: Request, res: Response) => {
       const sessionId = req.headers["mcp-session-id"] as string | undefined;
       let transport: StreamableHTTPServerTransport;
@@ -88,6 +83,8 @@ export class AnalysisApplication {
 
       await transport.handleRequest(req, res, req.body);
     });
+    this.setupErrorHandling();
+    this.logger.debug("MCP route registered successfully");
   }
 
   public async start(): Promise<void> {
@@ -140,7 +137,6 @@ export class AnalysisApplication {
   }
 
   private setupMiddleware(): void {
-    // Request logging
     this.app.use((req: Request, res: Response, next: NextFunction) => {
       const start = Date.now();
       res.on("finish", () => {

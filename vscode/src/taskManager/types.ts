@@ -28,6 +28,7 @@ export interface TaskManager {
   history: TasksHistory;
 
   init(): void;
-  getTasks(): TasksList;
+  getKnockOnTasks(): TasksList;
+  getCurrentTasks(): Task[];
   reset(): void;
 }

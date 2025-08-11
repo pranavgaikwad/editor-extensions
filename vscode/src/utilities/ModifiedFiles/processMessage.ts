@@ -97,7 +97,7 @@ const handleTasksInteraction = async (
   resetStuckAnalysisFlags(state);
 
   // Get and format tasks
-  const rawTasks = state.taskManager.getTasks();
+  const rawTasks = state.taskManager.getKnockOnTasks();
 
   if (rawTasks.currentTasks.length === 0) {
     // No tasks found - auto-reject
