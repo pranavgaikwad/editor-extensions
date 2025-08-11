@@ -42,16 +42,21 @@ export class AnalysisMcpServer {
       },
       this.listAnalysisIssuesInFileCallback,
     );
+    // this.server.tool(
+    //   "getNextAnalysisIssue",
+    //   "Get the next analysis issue to fix in the project",
+    //   this.getNextAnalysisIssueCallback,
+    // );
     this.server.tool(
       "getKnockOnIssues",
       "List all new issues in the project since the last call to listFilesWithAnalysisIssues",
       this.getKnockOnIssuesCallback,
     );
-    this.server.tool(
-      "resetKnockOnIssues",
-      "Resets the state that computes differences in issues prior and after a change was made.",
-      this.resetKnockOnIssuesCallback,
-    );
+    // this.server.tool(
+    //   "resetKnockOnIssues",
+    //   "Resets the state that computes differences in issues prior and after a change was made.",
+    //   this.resetKnockOnIssuesCallback,
+    // );
     return this.server.connect(transport);
   }
 
@@ -62,17 +67,71 @@ export class AnalysisMcpServer {
           type: "text",
           text: `Konveyor provides a set of static source code analysis tools to identify migration issues in the code.
 ** Workflow to fix issues**
-1. You should first list all the files with analysis issues in the project using the \`listFilesWithAnalysisIssuesCallback\` tool.
-2.Then you should start fixing issues in the files one by one. Try to solve as many issues in a file as possible in one edit.\
+1. List files with analysis issues using \`listFilesWithAnalysisIssuesCallback\` tool.
+2. Start fixing issues in files one file at a time. Try to solve as many issues in a file as possible in one edit.\
 **It is important to solve all issues in a file before moving to the next file.**
 3. Once you fix a file, call \`getKnockOnIssues\` function which will return a list of issues caused by the changes you made.\
 This compares the issues present before you made the changes and the issues present after you made the changes to compute the new issues.\
-Fix these new issues before moving onto the next file. It is OK if you cannot address some of the knock-on issues. **Also use can also skip a knock-on issue if you think its not related to your original change / file you started with.**.
-4. Once you're done fixing issues in a file, call \`resetKnockOnIssues\` function to reset the diff state. **This is an important step to ensure that knock-on issues are reported correctly.**
+Fix these new issues before moving onto the next file. It is OK if you cannot address some of the knock-on issues. **You can also skip a knock-on issue if you think its not related to the changes you made.**.
+4. Repeat until all issues are fixed or you are unable to fix any more issues. **It is important to call \`listFilesWithAnalysisIssues\` before moving onto the next file to ensure you always get uptodate list of issues.**
 `,
         },
       ],
     };
+  };
+
+  private getNextAnalysisIssueCallback: ToolCallback = async () => {
+    try {
+      await this.waitForAnalysisCompletion();
+      this.taskManager.reset();
+      const tasksByUri = this.taskManager
+        .getCurrentTasks()
+        .filter((t) => t instanceof AnalysisDiagnosticTask)
+        .reduce(
+          (acc, task) => {
+            const uri = task.getUri().toString();
+            if (!acc[uri]) {
+              acc[uri] = [];
+            }
+            acc[uri].push(task);
+            return acc;
+          },
+          {} as Record<string, AnalysisDiagnosticTask[]>,
+        );
+
+      const tasks = Object.entries(tasksByUri)
+        .map(([uri, tasks]) => ({ uri, tasks }))
+        .sort((a, b) =>
+          a.uri.endsWith("pom.xml")
+            ? -1
+            : b.uri.endsWith("pom.xml")
+              ? 1
+              : a.uri.localeCompare(b.uri),
+        );
+      const nextTask = tasks.length ? tasks[0] : null;
+      let nextIssue = "There are no more analysis issues to fix in the project";
+      if (nextTask) {
+        nextIssue = `File: ${toRelativePath(nextTask.tasks[0].getUri(), this.workspaceDir)}\nIssues:\n${nextTask.tasks.map((t) => t.toString()).join("\n")}`;
+      }
+      return {
+        content: [
+          {
+            type: "text",
+            text: nextIssue,
+          },
+        ],
+      };
+    } catch (error) {
+      return {
+        content: [
+          {
+            type: "text",
+            text: `Error getting next analysis issue: ${error instanceof Error ? error.message : "Unknown error"}`,
+          },
+        ],
+        isError: true,
+      };
+    }
   };
 
   private listFilesWithAnalysisIssuesCallback: ToolCallback = async () => {
