@@ -70,15 +70,11 @@ export function getRepoName(testInfo: TestInfo): string {
       `Invalid test file name format: ${testInfo.file}. Expected format: prefix_reponame.test.ts`
     );
   }
-  return parts[1];
+  return parts[parts.length - 1];
 }
 
 export function generateRandomString(length: number = 8): string {
   return Math.random()
     .toString(36)
     .substring(2, 2 + length);
-}
-
-export function providerIdentifier(providerConfig: ProviderConfig) {
-  return `${providerConfig.provider}-${providerConfig.model}`;
 }

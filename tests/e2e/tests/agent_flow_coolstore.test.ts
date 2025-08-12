@@ -1,0 +1,135 @@
+import * as pathlib from 'path';
+import { expect, test } from '../fixtures/test-repo-fixture';
+import { VSCode } from '../pages/vscode.pages';
+import { SCREENSHOTS_FOLDER } from '../utilities/consts';
+import { getRepoName } from '../utilities/utils';
+import {
+  OPENAI_GPT4O_PROVIDER,
+  OPENAI_GPT4OMINI_PROVIDER,
+} from '../fixtures/provider-configs.fixture';
+import { KAIViews } from '../enums/views.enum';
+
+// NOTE: This is the list of providers that have cached data for the coolstore app
+// Update this list when you create cache for a new provider, you probably don't need
+// to create cache for all providers, as the purpose of this test is to only test UX
+const providers = [OPENAI_GPT4O_PROVIDER, OPENAI_GPT4OMINI_PROVIDER];
+
+// NOTE: profileName is hardcoded for cache consistency
+const profileName = 'JavaEE to Quarkus';
+
+providers.forEach((config) => {
+  test.describe(`Coolstore app tests with agent mode enabled - offline (cached) | ${config.provider}/${config.model}`, () => {
+    let vscodeApp: VSCode;
+    test.beforeAll(async ({ testRepoData }: { testRepoData: any }, testInfo: any) => {
+      test.setTimeout(1600000);
+      const repoName = getRepoName(testInfo);
+      const repoInfo = testRepoData[repoName];
+      vscodeApp = await VSCode.open(repoInfo.repoUrl, repoInfo.repoName);
+      try {
+        await vscodeApp.deleteProfile(profileName);
+      } catch {
+        console.log(`An existing profile probably doesn't exist, creating a new one`);
+      }
+      await vscodeApp.createProfile(repoInfo.sources, repoInfo.targets, profileName);
+      if (process.env.UPDATE_LLM_CACHE) {
+        await vscodeApp.configureGenerativeAI(config.config);
+      }
+      await vscodeApp.startServer();
+      await vscodeApp.ensureLLMCache();
+    });
+
+    test.beforeEach(async () => {
+      const testName = test.info().title.replace(' ', '-');
+      console.log(`Starting ${testName} at ${new Date()}`);
+      await vscodeApp.getWindow().screenshot({
+        path: `${SCREENSHOTS_FOLDER}/before-${testName}-${config.model.replace(/[.:]/g, '-')}.png`,
+      });
+    });
+
+    // this test uses cached data, and only ensures that the agent mode flow works
+    test('Fix JMS Topic issue with agent mode enabled (offline)', async () => {
+      test.setTimeout(3600000);
+      // set demoMode and update java configuration to auto-reload
+      await vscodeApp.writeOrUpdateVSCodeSettings({
+        'konveyor.kai.cacheDir': pathlib.join('.vscode', 'cache'),
+        'konveyor.kai.demoMode': true,
+        'java.configuration.updateBuildConfiguration': 'automatic',
+      });
+      // we need to run analysis before enabling agent mode
+      await vscodeApp.waitDefault();
+      await vscodeApp.runAnalysis();
+      await expect(vscodeApp.getWindow().getByText('Analysis completed').first()).toBeVisible({
+        timeout: 300000,
+      });
+      // enable agent mode
+      const analysisView = await vscodeApp.getView(KAIViews.analysisView);
+      const agentModeSwitch = analysisView.locator('input#agent-mode-switch');
+      await agentModeSwitch.click();
+      // find the JMS issue to fix
+      await vscodeApp.searchViolation('References to JavaEE/JakartaEE JMS elements');
+      const fixButton = analysisView.locator('button#get-solution-button');
+      await expect(fixButton.first()).toBeVisible({ timeout: 6000 });
+      await fixButton.first().click();
+      const resolutionView = await vscodeApp.getView(KAIViews.resolutionDetails);
+      const loadingIndicator = resolutionView.locator('div.loading-indicator');
+      await expect(loadingIndicator.first()).toBeVisible({ timeout: 6000 });
+      let loadingIndicatorSeen = true;
+      let maxIterations = 100; // just for safety against inf loops
+      let lastEitherButtonCount = 0;
+      while (loadingIndicatorSeen) {
+        maxIterations -= 1;
+        if (maxIterations <= 0) {
+          throw new Error('Agent loop did not finish within 1000 iterations, this is unexpected');
+        }
+        // if the loading indicator is no longer visible, we have reached the end
+        if ((await resolutionView.locator('div.loading-indicator').count()) === 0) {
+          loadingIndicatorSeen = false;
+          break;
+        }
+        // either a Yes/No button or 'Accept all changes' button will be visible throughout the flow
+        const yesButton = resolutionView.locator('button').filter({ hasText: 'Yes' });
+        const acceptChangesLocator = resolutionView.locator(
+          'button[aria-label="Accept all changes"]'
+        );
+        const eitherButton = yesButton.or(acceptChangesLocator);
+        // Wait for new buttons to appear (indicating agent progress)
+        const currentButtonCount = await eitherButton.count();
+        if (currentButtonCount <= lastEitherButtonCount) {
+          let waitTime = 0;
+          const maxWaitTime = 30000;
+          const checkInterval = 1000;
+          while (waitTime < maxWaitTime) {
+            await vscodeApp.getWindow().waitForTimeout(checkInterval);
+            waitTime += checkInterval;
+            const newButtonCount = await eitherButton.count();
+            if (newButtonCount > lastEitherButtonCount) {
+              break;
+            }
+            if (waitTime >= maxWaitTime) {
+              throw new Error(
+                `Agent did not progress within 30 seconds. Button count remained at ${lastEitherButtonCount}`
+              );
+            }
+          }
+        }
+        lastEitherButtonCount = await eitherButton.count();
+        await eitherButton.last().dispatchEvent('click');
+      }
+    });
+
+    test.afterEach(async () => {
+      const testName = test.info().title.replace(' ', '-');
+      console.log(`Finished ${testName} at ${new Date()}`);
+      await vscodeApp.getWindow().screenshot({
+        path: `${SCREENSHOTS_FOLDER}/after-${testName}-${config.model.replace(/[.:]/g, '-')}.png`,
+      });
+    });
+
+    test.afterAll(async () => {
+      if (process.env.UPDATE_LLM_CACHE) {
+        await vscodeApp.updateLLMCache();
+      }
+      await vscodeApp.closeVSCode();
+    });
+  });
+});

@@ -305,7 +305,7 @@ export class VSCode extends BasePage {
         return;
       }
       // move stored zip to workspace
-      await extractZip(storedPath, wspacePath);
+      extractZip(storedPath, wspacePath);
     } catch (error) {
       console.error('Error unzipping test data:', error);
       throw error;
@@ -318,18 +318,9 @@ export class VSCode extends BasePage {
    */
   public async updateLLMCache() {
     const newCacheZip = path.join(path.dirname(this.llmCachePaths().storedPath), 'new.zip');
-    // move workspace zip to stored
-    if (fs.existsSync(this.llmCachePaths().storedPath)) {
-      console.log('Merging new cache with stored cache');
-      createZip(this.llmCachePaths().workspacePath, newCacheZip, this.llmCachePaths().storedPath);
-      fs.renameSync(newCacheZip, this.llmCachePaths().storedPath);
-      fs.renameSync(`${newCacheZip}.metadata`, `${this.llmCachePaths().storedPath}.metadata`);
-    } else {
-      console.log('Moving new cache zip to stored path');
-      createZip(this.llmCachePaths().workspacePath, newCacheZip);
-      fs.renameSync(newCacheZip, this.llmCachePaths().storedPath);
-      fs.renameSync(`${newCacheZip}.metadata`, `${this.llmCachePaths().storedPath}.metadata`);
-    }
+    createZip(this.llmCachePaths().workspacePath, newCacheZip);
+    fs.renameSync(newCacheZip, this.llmCachePaths().storedPath);
+    fs.renameSync(`${newCacheZip}.metadata`, `${this.llmCachePaths().storedPath}.metadata`);
   }
 
   private llmCachePaths(): {
