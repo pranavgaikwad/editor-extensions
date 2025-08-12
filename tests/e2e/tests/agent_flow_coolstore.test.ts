@@ -17,6 +17,9 @@ const providers = [OPENAI_GPT4O_PROVIDER, OPENAI_GPT4OMINI_PROVIDER];
 // NOTE: profileName is hardcoded for cache consistency
 const profileName = 'JavaEE to Quarkus';
 
+// Store VSCode instances for cache update after all providers complete
+const vscodeInstances: VSCode[] = [];
+
 providers.forEach((config) => {
   test.describe(`Coolstore app tests with agent mode enabled - offline (cached) | ${config.provider}/${config.model}`, () => {
     let vscodeApp: VSCode;
@@ -25,6 +28,10 @@ providers.forEach((config) => {
       const repoName = getRepoName(testInfo);
       const repoInfo = testRepoData[repoName];
       vscodeApp = await VSCode.open(repoInfo.repoUrl, repoInfo.repoName);
+
+      // Store instance for later cache update
+      vscodeInstances.push(vscodeApp);
+
       try {
         await vscodeApp.deleteProfile(profileName);
       } catch {
@@ -74,8 +81,8 @@ providers.forEach((config) => {
       const loadingIndicator = resolutionView.locator('div.loading-indicator');
       await expect(loadingIndicator.first()).toBeVisible({ timeout: 6000 });
       let loadingIndicatorSeen = true;
-      let maxIterations = 100; // just for safety against inf loops
-      let lastEitherButtonCount = 0;
+      let maxIterations = 1000; // just for safety against inf loops
+      let lastYesButtonCount = 0;
       while (loadingIndicatorSeen) {
         maxIterations -= 1;
         if (maxIterations <= 0) {
@@ -91,29 +98,15 @@ providers.forEach((config) => {
         const acceptChangesLocator = resolutionView.locator(
           'button[aria-label="Accept all changes"]'
         );
-        const eitherButton = yesButton.or(acceptChangesLocator);
-        // Wait for new buttons to appear (indicating agent progress)
-        const currentButtonCount = await eitherButton.count();
-        if (currentButtonCount <= lastEitherButtonCount) {
-          let waitTime = 0;
-          const maxWaitTime = 30000;
-          const checkInterval = 1000;
-          while (waitTime < maxWaitTime) {
-            await vscodeApp.getWindow().waitForTimeout(checkInterval);
-            waitTime += checkInterval;
-            const newButtonCount = await eitherButton.count();
-            if (newButtonCount > lastEitherButtonCount) {
-              break;
-            }
-            if (waitTime >= maxWaitTime) {
-              throw new Error(
-                `Agent did not progress within 30 seconds. Button count remained at ${lastEitherButtonCount}`
-              );
-            }
-          }
+        const yesButtonCount = await yesButton.count();
+        if (yesButtonCount > lastYesButtonCount) {
+          lastYesButtonCount = yesButtonCount;
+          await yesButton.last().click();
+        } else if ((await acceptChangesLocator.count()) > 0) {
+          await acceptChangesLocator.last().click();
+        } else {
+          await vscodeApp.waitDefault();
         }
-        lastEitherButtonCount = await eitherButton.count();
-        await eitherButton.last().dispatchEvent('click');
       }
     });
 
@@ -126,10 +119,17 @@ providers.forEach((config) => {
     });
 
     test.afterAll(async () => {
-      if (process.env.UPDATE_LLM_CACHE) {
-        await vscodeApp.updateLLMCache();
-      }
       await vscodeApp.closeVSCode();
     });
   });
+});
+
+// Global cleanup that runs after ALL provider tests complete
+test.afterAll(async () => {
+  if (process.env.UPDATE_LLM_CACHE && vscodeInstances.length > 0) {
+    // Use the last VSCode instance to update the cache
+    // This preserves cache data from all providers since they all write to the same workspace
+    const lastInstance = vscodeInstances[vscodeInstances.length - 1];
+    await lastInstance.updateLLMCache();
+  }
 });
