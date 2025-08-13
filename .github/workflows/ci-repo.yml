@@ -264,10 +264,17 @@ jobs:
           path: ./dist
 
       - name: Run e2e tests (Linux)
-        run: npx playwright test e2e/tests/configure-and-run-analysis.test.ts e2e/tests/agent_flow_coolstore.test.ts
+        run: npx playwright test e2e/tests/configure-and-run-analysis.test.ts
         working-directory: ./tests
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          VSIX_FILE_PATH: ${{ github.workspace }}/dist/konveyor-ai.vsix
+
+      # This is intentionally kept in a separate step to avoid passing in credentials
+      - name: Run e2e tests (Offline)
+        run: npx playwright test e2e/tests/agent_flow_coolstore.test.ts
+        working-directory: ./tests
+        env:
           VSIX_FILE_PATH: ${{ github.workspace }}/dist/konveyor-ai.vsix
 
   publish:

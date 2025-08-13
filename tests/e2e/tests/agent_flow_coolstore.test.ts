@@ -3,16 +3,13 @@ import { expect, test } from '../fixtures/test-repo-fixture';
 import { VSCode } from '../pages/vscode.page';
 import { SCREENSHOTS_FOLDER } from '../utilities/consts';
 import { getRepoName } from '../utilities/utils';
-import {
-  OPENAI_GPT4O_PROVIDER,
-  OPENAI_GPT4OMINI_PROVIDER,
-} from '../fixtures/provider-configs.fixture';
+import { OPENAI_GPT4O_PROVIDER } from '../fixtures/provider-configs.fixture';
 import { KAIViews } from '../enums/views.enum';
 
 // NOTE: This is the list of providers that have cached data for the coolstore app
 // Update this list when you create cache for a new provider, you probably don't need
 // to create cache for all providers, as the purpose of this test is to only test UX
-const providers = [OPENAI_GPT4O_PROVIDER, OPENAI_GPT4OMINI_PROVIDER];
+const providers = [OPENAI_GPT4O_PROVIDER];
 
 // NOTE: profileName is hardcoded for cache consistency
 const profileName = 'JavaEE to Quarkus';

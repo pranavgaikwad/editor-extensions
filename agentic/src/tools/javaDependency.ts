@@ -92,7 +92,7 @@ export class JavaDependencyTools {
             response = depToString(mavenResponse[0]);
           }
         } else if (mavenResponse && !mavenResponse.length) {
-          response = `It appears that the given GroupID and ArtifactID do not exist in the Maven Central repository. Please try another GroupID and/or ArtifactID.`;
+          response = `Invalid GroupID or ArtifactID. Please try a different GroupID and/or ArtifactID.`;
         }
         await this.cache.set(cacheKey, response, {
           cacheSubDir,

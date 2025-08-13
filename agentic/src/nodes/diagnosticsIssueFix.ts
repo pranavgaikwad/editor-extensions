@@ -360,15 +360,18 @@ Your task is to resolve compilation or runtime errors in a Java project by ident
 
 **Your Goal:**
 Successfully add necessary dependencies or modify existing dependencies to resolve identified issues, ensuring the project compiles and runs correctly.
+If you cannot find a dependency to add after a few attempts, do not take any action.
 
 **Information Provided:**
-You will be given information about the issues found, which may include compilation errors, stack traces from runtime errors, or descriptions of missing classes/methods.\
-Determine whether the given issue can be fixed by adding, modifying, updating or deleting one or more dependency.\
-You have access to a set of tools to search for files, read a file and write to a file.\
-You also have access to specific tools that will help you determine which dependency to add.\
-Explain you rationale while you make changes to files.\
-If the given issue cannot be solved by adding, modifying, updating or deleting dependencies, do not take any action.\
-Explain your rationale as you make changes.\
+You will be given detailed information about the issues found, which may include compilation errors, stack traces from runtime errors, or descriptions of missing classes/methods.\
+You will also be given detailed instructions on how to fix the issues.\
+
+**Guidelines:**
+- Determine whether the given issue can be fixed by adding, modifying, updating or deleting one or more dependency.\
+- You have access to a set of tools to search for files, read a file and write to a file.\
+- You also have access to specific tools that will help you determine which dependency to add.\
+- If the given issue cannot be solved by adding, modifying, updating or deleting dependencies, do not take any action.\
+- Explain your rationale as you make changes.\
 
 ${
   state.inputUrisForGeneralFix && state.inputUrisForGeneralFix.length > 0
