@@ -111,19 +111,17 @@ export class JavaDependencyTools {
   ): Promise<MavenResponseDoc[] | string> {
     let response: MavenResponseDoc[] | string =
       "No dependencies found matching given search criteria. Try a broader search without a version constraint.";
-    const query = [artifactID, groupID, version]
-      .filter(Boolean)
-      .map((val, idx) => {
-        switch (idx) {
-          case 0:
-            return `a:${val}`;
-          case 1:
-            return `g:${val}`;
-          case 2:
-            return `v:${val}`;
-        }
-      })
-      .join(" AND ");
+    const terms: string[] = [];
+    if (artifactID) {
+      terms.push(`a:"${artifactID}"`);
+    }
+    if (groupID) {
+      terms.push(`g:"${groupID}"`);
+    }
+    if (version) {
+      terms.push(`v:"${version}"`);
+    }
+    const query = terms.join(" AND ");
     const url = `https://search.maven.org/solrsearch/select?q=${query}`;
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 10000);

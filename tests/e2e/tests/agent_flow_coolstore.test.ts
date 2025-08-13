@@ -1,6 +1,6 @@
 import * as pathlib from 'path';
 import { expect, test } from '../fixtures/test-repo-fixture';
-import { VSCode } from '../pages/vscode.pages';
+import { VSCode } from '../pages/vscode.page';
 import { SCREENSHOTS_FOLDER } from '../utilities/consts';
 import { getRepoName } from '../utilities/utils';
 import {
@@ -17,9 +17,6 @@ const providers = [OPENAI_GPT4O_PROVIDER, OPENAI_GPT4OMINI_PROVIDER];
 // NOTE: profileName is hardcoded for cache consistency
 const profileName = 'JavaEE to Quarkus';
 
-// Store VSCode instances for cache update after all providers complete
-const vscodeInstances: VSCode[] = [];
-
 providers.forEach((config) => {
   test.describe(`Coolstore app tests with agent mode enabled - offline (cached) | ${config.provider}/${config.model}`, () => {
     let vscodeApp: VSCode;
@@ -28,10 +25,6 @@ providers.forEach((config) => {
       const repoName = getRepoName(testInfo);
       const repoInfo = testRepoData[repoName];
       vscodeApp = await VSCode.open(repoInfo.repoUrl, repoInfo.repoName);
-
-      // Store instance for later cache update
-      vscodeInstances.push(vscodeApp);
-
       try {
         await vscodeApp.deleteProfile(profileName);
       } catch {
@@ -119,17 +112,10 @@ providers.forEach((config) => {
     });
 
     test.afterAll(async () => {
+      if (process.env.UPDATE_LLM_CACHE) {
+        await vscodeApp.updateLLMCache();
+      }
       await vscodeApp.closeVSCode();
     });
   });
-});
-
-// Global cleanup that runs after ALL provider tests complete
-test.afterAll(async () => {
-  if (process.env.UPDATE_LLM_CACHE && vscodeInstances.length > 0) {
-    // Use the last VSCode instance to update the cache
-    // This preserves cache data from all providers since they all write to the same workspace
-    const lastInstance = vscodeInstances[vscodeInstances.length - 1];
-    await lastInstance.updateLLMCache();
-  }
 });
