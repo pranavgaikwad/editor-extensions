@@ -1,5 +1,6 @@
 import * as vscode from "vscode";
 import * as pathlib from "path";
+import * as fs from "fs/promises";
 import { fileURLToPath } from "url";
 import { KONVEYOR_CONFIG_KEY } from "./constants";
 import { AnalysisProfile, createConfigError, ExtensionData } from "@editor-extensions/shared";
@@ -63,6 +64,27 @@ export const getConfigMaxLLMQueries = (): number | undefined =>
 export const getConfigAgentMode = (): boolean => getConfigValue<boolean>("kai.agentMode") ?? false;
 export const getExcludedDiagnosticSources = (): string[] =>
   getConfigValue<string[]>("kai.excludedDiagnosticSources") ?? [];
+
+/**
+ * Get all configuration values for keys defined in the package.json file. Used in debugging.
+ * @param extensionPath - The path to the extension.
+ * @returns A record of all configuration values.
+ */
+export async function getAllConfigurationValues(
+  extensionPath: string,
+): Promise<Record<string, any>> {
+  const packageJsonPath = pathlib.join(extensionPath, "package.json");
+  const packageJson = JSON.parse(await fs.readFile(packageJsonPath, "utf8"));
+  const configSchema = packageJson.contributes?.configuration?.properties || {};
+  const result: Record<string, any> = {};
+  Object.keys(configSchema).forEach((fullKey) => {
+    if (fullKey.startsWith("konveyor.")) {
+      const key = fullKey.replace("konveyor.", "");
+      result[key] = vscode.workspace.getConfiguration(KONVEYOR_CONFIG_KEY).get(key);
+    }
+  });
+  return result;
+}
 
 export const updateSolutionServerUrl = async (value: string | undefined): Promise<void> => {
   await updateConfigValue("solutionServer.url", value, vscode.ConfigurationTarget.Workspace);
@@ -172,7 +194,7 @@ export function updateActiveProfileValidity(draft: ExtensionData, assetRulesetPa
   }
 }
 
-function getWorkspaceRelativePath(
+export function getWorkspaceRelativePath(
   path: string | undefined,
   workspaceRoot: string | undefined,
 ): string | undefined {

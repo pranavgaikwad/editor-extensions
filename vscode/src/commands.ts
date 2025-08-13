@@ -1,3 +1,6 @@
+import AdmZip from "adm-zip";
+import * as pathlib from "path";
+import * as fs from "fs/promises";
 import { ExtensionState } from "./extensionState";
 import {
   window,
@@ -40,7 +43,13 @@ import {
   discardFile,
   applyBlock,
 } from "./diffView";
-import { updateAnalyzerPath, getConfigAgentMode } from "./utilities/configuration";
+import {
+  updateAnalyzerPath,
+  getConfigAgentMode,
+  getAllConfigurationValues,
+  fileUriToPath,
+  getWorkspaceRelativePath,
+} from "./utilities/configuration";
 import { runPartialAnalysis } from "./analysis";
 import { fixGroupOfIncidents, IncidentTypeItem } from "./issueView";
 import { paths } from "./paths";
@@ -51,6 +60,7 @@ import { v4 as uuidv4 } from "uuid";
 import { processMessage } from "./utilities/ModifiedFiles/processMessage";
 import { MessageQueueManager } from "./utilities/ModifiedFiles/queueManager";
 import type { Logger } from "winston";
+import { parseModelConfig, getProviderConfigKeys } from "./modelProvider/config";
 
 const isWindows = process.platform === "win32";
 
@@ -607,6 +617,110 @@ const commandsMap: (
     "konveyor.diffView.applySelection": applyBlock,
     "konveyor.diffView.applySelectionInline": applyBlock,
     "konveyor.partialAnalysis": async (filePaths: Uri[]) => runPartialAnalysis(state, filePaths),
+    "konveyor.generateDebugArchive": async () => {
+      const archiveRawPath = await window.showInputBox({
+        title: "Enter the path where the debug archive will be saved",
+        value: pathlib.join(
+          ".vscode",
+          `konveyor-log-${new Date().toISOString().replace(/[:.]/g, "-")}.zip`,
+        ),
+        ignoreFocusOut: true,
+        placeHolder: "Enter the path where the debug archive will be saved",
+        validateInput: async (value) => {
+          if (!value) {
+            return "Path is required";
+          }
+          if (pathlib.extname(value) !== ".zip") {
+            return "Path must have a .zip extension";
+          }
+          return null;
+        },
+      });
+      if (!archiveRawPath) {
+        window.showErrorMessage("No path provided");
+        return;
+      }
+      const archivePath = getWorkspaceRelativePath(archiveRawPath, state.data.workspaceRoot);
+      if (!archivePath) {
+        window.showErrorMessage(`Invalid path: ${archiveRawPath}`);
+        return;
+      }
+      // redact provider config
+      let redactedProviderConfig: Record<string, any> = {};
+      const providerConfigPath = pathlib.join(pathlib.dirname(archivePath), `provider-config.json`);
+      try {
+        const parsedConfig = await parseModelConfig(paths().settingsYaml);
+        const configuredKeys = getProviderConfigKeys(parsedConfig);
+        const unredactedKeys = await window.showQuickPick(
+          configuredKeys.map((obj) => ({
+            label: obj.key,
+          })),
+          {
+            title:
+              "Select provider settings values you would like to include in the archive, all other values will be redacted",
+            canPickMany: true,
+            ignoreFocusOut: true,
+          },
+        );
+        const unredactedKeySet = new Set((unredactedKeys || []).map((item) => item.label));
+        redactedProviderConfig = configuredKeys.reduce(
+          (acc, keyValue) => {
+            acc[keyValue.key] = unredactedKeySet.has(keyValue.key) ? keyValue.value : "<redacted>";
+            return acc;
+          },
+          {} as Record<string, any>,
+        );
+        await fs.writeFile(
+          providerConfigPath,
+          JSON.stringify(redactedProviderConfig, null, 2),
+          "utf8",
+        );
+      } catch (err) {
+        window.showInformationMessage(
+          `Failed to parse provider settings file. Archive will not include provider settings.`,
+        );
+        logger.error("Failed to parse provider settings file", { error: err });
+      }
+      // get extension config
+      let extensionConfig: Record<string, any> = {};
+      const extensionConfigPath = pathlib.join(
+        pathlib.dirname(archivePath),
+        `extension-config.json`,
+      );
+      try {
+        extensionConfig = await getAllConfigurationValues(state.extensionContext.extensionPath);
+        await fs.writeFile(extensionConfigPath, JSON.stringify(extensionConfig, null, 2), "utf8");
+      } catch (err) {
+        window.showErrorMessage(
+          `Failed to get extension configuration. Archive will not include extension configuration.`,
+        );
+        logger.error("Failed to get extension configuration", { error: err });
+      }
+      // add logs and write zip
+      try {
+        const zipArchive = new AdmZip();
+        zipArchive.addLocalFolder(fileUriToPath(state.extensionContext.logUri.fsPath));
+        zipArchive.addLocalFile(providerConfigPath);
+        zipArchive.addLocalFile(extensionConfigPath);
+        await zipArchive.writeZipPromise(archivePath);
+        window.showInformationMessage(`Debug archive created at: ${archivePath}`);
+      } catch (error) {
+        logger.error("Error generating debug archive", { error, archivePath });
+        window.showErrorMessage(
+          `Failed to generate debug archive: ${error instanceof Error ? error.message : String(error)}`,
+        );
+      }
+      try {
+        await fs.unlink(providerConfigPath);
+        await fs.unlink(extensionConfigPath);
+      } catch (error) {
+        logger.error("Error cleaning up temporary files", {
+          error,
+          providerConfigPath,
+          extensionConfigPath,
+        });
+      }
+    },
   };
 };
 

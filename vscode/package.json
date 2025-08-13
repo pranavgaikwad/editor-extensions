@@ -258,6 +258,12 @@
         "icon": "$(arrow-left)",
         "category": "diffEditor",
         "title": "Apply Selection"
+      },
+      {
+        "command": "konveyor.generateDebugArchive",
+        "title": "Generate Debug Archive",
+        "category": "Konveyor",
+        "icon": "$(bug)"
       }
     ],
     "submenus": [
