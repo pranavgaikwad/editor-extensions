@@ -238,7 +238,9 @@ export class VSCode extends BasePage {
 
     for (const target of targets) {
       await targetsInput.fill(target);
-      await manageProfileView.getByRole('option', { name: target, exact: true }).click();
+      await manageProfileView
+        .getByRole('option', { name: target, exact: true })
+        .click({ timeout: 5000 });
     }
     await this.window.keyboard.press('Escape');
 
@@ -248,7 +250,9 @@ export class VSCode extends BasePage {
 
     for (const source of sources) {
       await sourceInput.fill(source);
-      await manageProfileView.getByRole('option', { name: source, exact: true }).click();
+      await manageProfileView
+        .getByRole('option', { name: source, exact: true })
+        .click({ timeout: 5000 });
     }
     await this.window.keyboard.press('Escape');
   }
@@ -259,10 +263,11 @@ export class VSCode extends BasePage {
     const profileList = manageProfileView.getByRole('list', {
       name: 'Profile list',
     });
+    await profileList.waitFor({ state: 'visible', timeout: 5000 });
 
     const profileItems = profileList.getByRole('listitem');
     try {
-      await profileItems.filter({ hasText: profileName }).click();
+      await profileItems.filter({ hasText: profileName }).click({ timeout: 5000 });
       await manageProfileView.getByRole('button', { name: 'Delete Profile' }).click();
       const confirmButton = manageProfileView
         .getByRole('dialog', { name: 'Delete profile?' })
