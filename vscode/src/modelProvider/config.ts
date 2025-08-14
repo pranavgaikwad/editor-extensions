@@ -4,7 +4,7 @@ import * as winston from "winston";
 import { workspace, Uri } from "vscode";
 import { KaiModelProvider } from "@editor-extensions/agentic";
 
-import { ParsedModelConfig } from "./types";
+import { type ModelCapabilities, ParsedModelConfig } from "./types";
 import { ModelCreators } from "./modelCreator";
 import { getCacheForModelProvider } from "./utils";
 import { getTraceEnabled, getConfigKaiDemoMode } from "../utilities/configuration";
@@ -101,7 +101,19 @@ export async function getModelProviderFromConfig(
     return ModelProviders[parsedConfig.config.provider]();
   }
 
-  const capabilities = await runModelHealthCheck(streamingModel, nonStreamingModel);
+  let capabilities: ModelCapabilities = {
+    supportsTools: false,
+    supportsToolsInStreaming: false,
+  };
+  try {
+    capabilities = await runModelHealthCheck(streamingModel, nonStreamingModel);
+  } catch (err) {
+    logger.error("Error running model health check:", err);
+    if (!getConfigKaiDemoMode()) {
+      // only throw error when we are not in demo mode
+      throw err;
+    }
+  }
 
   const subDir = (dir: string): string =>
     pathlib.join(
