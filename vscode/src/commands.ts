@@ -47,8 +47,9 @@ import {
   updateAnalyzerPath,
   getConfigAgentMode,
   getAllConfigurationValues,
-  fileUriToPath,
   getWorkspaceRelativePath,
+  getTraceEnabled,
+  getTraceDir,
 } from "./utilities/configuration";
 import { runPartialAnalysis } from "./analysis";
 import { fixGroupOfIncidents, IncidentTypeItem } from "./issueView";
@@ -689,6 +690,7 @@ const commandsMap: (
       );
       try {
         extensionConfig = await getAllConfigurationValues(state.extensionContext.extensionPath);
+
         await fs.writeFile(extensionConfigPath, JSON.stringify(extensionConfig, null, 2), "utf8");
       } catch (err) {
         window.showErrorMessage(
@@ -699,9 +701,21 @@ const commandsMap: (
       // add logs and write zip
       try {
         const zipArchive = new AdmZip();
-        zipArchive.addLocalFolder(fileUriToPath(state.extensionContext.logUri.fsPath));
+        const traceDir = getTraceDir(state.data.workspaceRoot);
+        if (getTraceEnabled() && traceDir) {
+          const includeLLMTraces = await window.showQuickPick(["Yes", "No"], {
+            title: "Include LLM traces?",
+            ignoreFocusOut: true,
+          });
+          if (includeLLMTraces === "Yes") {
+            zipArchive.addLocalFolder(traceDir);
+          }
+        }
         zipArchive.addLocalFile(providerConfigPath);
         zipArchive.addLocalFile(extensionConfigPath);
+        await fs.mkdir(pathlib.dirname(archivePath), {
+          recursive: true,
+        });
         await zipArchive.writeZipPromise(archivePath);
         window.showInformationMessage(`Debug archive created at: ${archivePath}`);
       } catch (error) {
