@@ -653,9 +653,12 @@ const commandsMap: (
         const parsedConfig = await parseModelConfig(paths().settingsYaml);
         const configuredKeys = getProviderConfigKeys(parsedConfig);
         const unredactedKeys = await window.showQuickPick(
-          configuredKeys.map((obj) => ({
-            label: obj.key,
-          })),
+          configuredKeys
+            .map((obj) => ({
+              label: obj.key,
+            }))
+            // all envs will be redacted no matter what
+            .filter((item) => !item.label.startsWith("env.")),
           {
             title:
               "Select provider settings values you would like to include in the archive, all other values will be redacted",
