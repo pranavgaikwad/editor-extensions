@@ -1,6 +1,5 @@
 import * as vscode from "vscode";
 import * as pathlib from "path";
-import * as fs from "fs/promises";
 import { fileURLToPath } from "url";
 import { KONVEYOR_CONFIG_KEY } from "./constants";
 import { AnalysisProfile, createConfigError, ExtensionData } from "@editor-extensions/shared";
@@ -67,22 +66,16 @@ export const getExcludedDiagnosticSources = (): string[] =>
 
 /**
  * Get all configuration values for keys defined in the package.json file. Used in debugging.
- * @param extensionPath - The path to the extension.
  * @returns A record of all configuration values.
  */
-export async function getAllConfigurationValues(
-  extensionPath: string,
-): Promise<Record<string, any>> {
-  const packageJsonPath = pathlib.join(extensionPath, "package.json");
-  const packageJson = JSON.parse(await fs.readFile(packageJsonPath, "utf8"));
-  const configSchema = packageJson.contributes?.configuration?.properties || {};
+export function getAllConfigurationValues(): Record<string, any> {
+  const config = vscode.workspace.getConfiguration(KONVEYOR_CONFIG_KEY);
   const result: Record<string, any> = {};
-  Object.keys(configSchema).forEach((fullKey) => {
-    if (fullKey.startsWith("konveyor.")) {
-      const key = fullKey.replace("konveyor.", "");
-      result[key] = vscode.workspace.getConfiguration(KONVEYOR_CONFIG_KEY).get(key);
+  for (const key of Object.keys(config)) {
+    if (!key.startsWith("inspect") && !key.startsWith("update")) {
+      result[key] = config.get(key);
     }
-  });
+  }
   return result;
 }
 

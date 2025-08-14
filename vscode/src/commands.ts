@@ -688,15 +688,17 @@ const commandsMap: (
         logger.error("Failed to parse provider settings file", { error: err });
       }
       // get extension config
-      let extensionConfig: Record<string, any> = {};
       const extensionConfigPath = pathlib.join(
         pathlib.dirname(archivePath),
         `extension-config.json`,
       );
       let extensionConfigWritten = false;
       try {
-        extensionConfig = await getAllConfigurationValues(state.extensionContext.extensionPath);
-        await fs.writeFile(extensionConfigPath, JSON.stringify(extensionConfig, null, 2), "utf8");
+        await fs.writeFile(
+          extensionConfigPath,
+          JSON.stringify(getAllConfigurationValues(), null, 2),
+          "utf8",
+        );
         extensionConfigWritten = true;
       } catch (err) {
         window.showInformationMessage(
