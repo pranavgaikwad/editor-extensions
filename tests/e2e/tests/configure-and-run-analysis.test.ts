@@ -39,7 +39,7 @@ test.describe(`Configure extension and run analysis`, () => {
     });
   });
 
-  test('Generate debug archive', async () => {
+  test('Generate debug archive', async ({ testRepoData }) => {
     await vscodeApp.executeQuickCommand('Konveyor: Generate Debug Archive');
     await vscodeApp.waitDefault();
     const zipPathInput = vscodeApp
@@ -57,7 +57,14 @@ test.describe(`Configure extension and run analysis`, () => {
     expect(await redactProviderConfigInput.count()).toEqual(1);
     await vscodeApp.getWindow().keyboard.press('Enter');
     await vscodeApp.waitDefault();
-    const zipStat = await fs.stat(pathlib.join('.vscode', 'debug-archive.zip'));
+    const includeLLMTracesPrompt = vscodeApp.getWindow().getByText('Include LLM traces?');
+    if ((await includeLLMTracesPrompt.count()) === 1) {
+      await vscodeApp.getWindow().keyboard.press('Enter');
+      await vscodeApp.waitDefault();
+    }
+    const zipStat = await fs.stat(
+      pathlib.join(testRepoData['coolstore'].repoName, '.vscode', 'debug-archive.zip')
+    );
     expect(zipStat.isFile()).toBe(true);
   });
 

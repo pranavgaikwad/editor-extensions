@@ -649,6 +649,7 @@ const commandsMap: (
       // redact provider config
       let redactedProviderConfig: Record<string, any> = {};
       const providerConfigPath = pathlib.join(pathlib.dirname(archivePath), `provider-config.json`);
+      let providerConfigWritten = false;
       try {
         const parsedConfig = await parseModelConfig(paths().settingsYaml);
         const configuredKeys = getProviderConfigKeys(parsedConfig);
@@ -679,6 +680,7 @@ const commandsMap: (
           JSON.stringify(redactedProviderConfig, null, 2),
           "utf8",
         );
+        providerConfigWritten = true;
       } catch (err) {
         window.showInformationMessage(
           `Failed to parse provider settings file. Archive will not include provider settings.`,
@@ -691,31 +693,50 @@ const commandsMap: (
         pathlib.dirname(archivePath),
         `extension-config.json`,
       );
+      let extensionConfigWritten = false;
       try {
         extensionConfig = await getAllConfigurationValues(state.extensionContext.extensionPath);
-
         await fs.writeFile(extensionConfigPath, JSON.stringify(extensionConfig, null, 2), "utf8");
+        extensionConfigWritten = true;
       } catch (err) {
-        window.showErrorMessage(
+        window.showInformationMessage(
           `Failed to get extension configuration. Archive will not include extension configuration.`,
         );
         logger.error("Failed to get extension configuration", { error: err });
       }
+      // add traces dir if it exists
+      const traceDir = getTraceDir(state.data.workspaceRoot);
+      let traceDirFound = false;
+      let includeLLMTraces: string | undefined = "No";
+      try {
+        if (getTraceEnabled() && traceDir) {
+          const traceStat = await fs.stat(traceDir);
+          if (traceStat.isDirectory()) {
+            includeLLMTraces = await window.showQuickPick(["Yes", "No"], {
+              title: "Include LLM traces?",
+              ignoreFocusOut: true,
+            });
+            traceDirFound = true;
+          }
+        }
+      } catch (err) {
+        logger.error("Error getting trace directory", { error: err });
+        window.showInformationMessage(
+          `Failed to get trace directory. Archive will not include LLM traces.`,
+        );
+      }
       // add logs and write zip
       try {
         const zipArchive = new AdmZip();
-        const traceDir = getTraceDir(state.data.workspaceRoot);
-        if (getTraceEnabled() && traceDir) {
-          const includeLLMTraces = await window.showQuickPick(["Yes", "No"], {
-            title: "Include LLM traces?",
-            ignoreFocusOut: true,
-          });
-          if (includeLLMTraces === "Yes") {
-            zipArchive.addLocalFolder(traceDir);
-          }
+        if (traceDirFound && includeLLMTraces === "Yes") {
+          zipArchive.addLocalFolder(traceDir as string);
         }
-        zipArchive.addLocalFile(providerConfigPath);
-        zipArchive.addLocalFile(extensionConfigPath);
+        if (providerConfigWritten) {
+          zipArchive.addLocalFile(providerConfigPath);
+        }
+        if (extensionConfigWritten) {
+          zipArchive.addLocalFile(extensionConfigPath);
+        }
         await fs.mkdir(pathlib.dirname(archivePath), {
           recursive: true,
         });
