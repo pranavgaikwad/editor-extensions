@@ -28,9 +28,7 @@ providers.forEach((config) => {
         console.log(`An existing profile probably doesn't exist, creating a new one`);
       }
       await vscodeApp.createProfile(repoInfo.sources, repoInfo.targets, profileName);
-      if (process.env.UPDATE_LLM_CACHE) {
-        await vscodeApp.configureGenerativeAI(config.config);
-      }
+      await vscodeApp.configureGenerativeAI(config.config);
       await vscodeApp.startServer();
       await vscodeApp.ensureLLMCache();
     });
