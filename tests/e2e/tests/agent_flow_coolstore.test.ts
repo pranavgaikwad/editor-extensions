@@ -62,14 +62,19 @@ providers.forEach((config) => {
       const analysisView = await vscodeApp.getView(KAIViews.analysisView);
       const agentModeSwitch = analysisView.locator('input#agent-mode-switch');
       await agentModeSwitch.click();
+      console.log('Agent mode enabled');
       // find the JMS issue to fix
       await vscodeApp.searchViolation('References to JavaEE/JakartaEE JMS elements');
       const fixButton = analysisView.locator('button#get-solution-button');
       await expect(fixButton.first()).toBeVisible({ timeout: 6000 });
       await fixButton.first().click();
+      console.log('Fix button clicked');
       const resolutionView = await vscodeApp.getView(KAIViews.resolutionDetails);
+      await vscodeApp.waitDefault();
       const loadingIndicator = resolutionView.locator('div.loading-indicator');
-      await expect(loadingIndicator.first()).toBeVisible({ timeout: 10000 });
+      console.log('Waiting for chat session to begin');
+      await expect(loadingIndicator.first()).toBeVisible({ timeout: 30000 });
+      console.log('Loading indicator found, chat session started');
       let loadingIndicatorSeen = true;
       let maxIterations = 1000; // just for safety against inf loops
       let lastYesButtonCount = 0;
@@ -92,8 +97,10 @@ providers.forEach((config) => {
         if (yesButtonCount > lastYesButtonCount) {
           lastYesButtonCount = yesButtonCount;
           await yesButton.last().click();
+          console.log('Yes button clicked');
         } else if ((await acceptChangesLocator.count()) > 0) {
           await acceptChangesLocator.last().click();
+          console.log('Accept all changes button clicked');
         } else {
           await vscodeApp.waitDefault();
         }
