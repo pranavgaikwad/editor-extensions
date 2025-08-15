@@ -78,12 +78,12 @@ providers.forEach((config) => {
         ),
       });
       let done = false;
-      let maxIterations = 200; // just for safety against inf loops, increase when generating new cache if this is hit
+      let maxIterations = process.env.CI ? 50 : 200; // just for safety against inf loops, increase when generating new cache if this is hit
       let lastYesButtonCount = 0;
       while (!done) {
         maxIterations -= 1;
         if (maxIterations <= 0) {
-          throw new Error('Agent loop did not finish within 200 iterations, this is unexpected');
+          throw new Error('Agent loop did not finish within given iterations, this is unexpected');
         }
         // if the loading indicator is no longer visible, we have reached the end
         if ((await resolutionView.getByText('Done addressing all issues. Goodbye!').count()) > 0) {
@@ -130,7 +130,9 @@ providers.forEach((config) => {
               `resolution-view-waiting.png`
             ),
           });
-          console.log(`Waiting for 3 seconds, ${maxIterations} iterations remaining`);
+          console.log(
+            `Waiting for 3 seconds for next action to appear, ${maxIterations} iterations remaining`
+          );
           await vscodeApp.getWindow().waitForTimeout(3000);
         }
       }
