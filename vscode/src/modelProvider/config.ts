@@ -2,6 +2,7 @@ import { parse } from "yaml";
 import * as pathlib from "path";
 import * as winston from "winston";
 import { workspace, Uri } from "vscode";
+import { AIMessage } from "@langchain/core/messages";
 import { KaiModelProvider } from "@editor-extensions/agentic";
 
 import { type ModelCapabilities, ParsedModelConfig } from "./types";
@@ -97,24 +98,6 @@ export async function getModelProviderFromConfig(
     mergedEnv,
   );
 
-  if (ModelProviders[parsedConfig.config.provider]) {
-    return ModelProviders[parsedConfig.config.provider]();
-  }
-
-  let capabilities: ModelCapabilities = {
-    supportsTools: false,
-    supportsToolsInStreaming: false,
-  };
-  try {
-    capabilities = await runModelHealthCheck(streamingModel, nonStreamingModel);
-  } catch (err) {
-    logger.error("Error running model health check:", err);
-    if (!getConfigKaiDemoMode()) {
-      // only throw error when we are not in demo mode
-      throw err;
-    }
-  }
-
   const subDir = (dir: string): string =>
     pathlib.join(
       dir,
@@ -125,12 +108,46 @@ export async function getModelProviderFromConfig(
       ),
     );
 
+  const cache = getCacheForModelProvider(getConfigKaiDemoMode(), logger, subDir(cacheDir ?? ""));
+  const tracer = getCacheForModelProvider(getTraceEnabled(), logger, subDir(traceDir ?? ""), true);
+
+  let capabilities: ModelCapabilities = {
+    supportsTools: false,
+    supportsToolsInStreaming: false,
+  };
+  try {
+    if (getConfigKaiDemoMode()) {
+      const cachedHealthcheck = await cache.get("capabilities", {
+        cacheSubDir: "healthcheck",
+      });
+      if (cachedHealthcheck) {
+        capabilities = JSON.parse(cachedHealthcheck.content as string) as ModelCapabilities;
+      }
+    }
+    capabilities = await runModelHealthCheck(streamingModel, nonStreamingModel);
+    if (getConfigKaiDemoMode()) {
+      await cache.set("capabilities", new AIMessage(JSON.stringify(capabilities)), {
+        cacheSubDir: "healthcheck",
+      });
+    }
+  } catch (err) {
+    logger.error("Error running model health check:", err);
+    if (!getConfigKaiDemoMode()) {
+      // only throw error when we are not in demo mode
+      throw err;
+    }
+  }
+
+  if (ModelProviders[parsedConfig.config.provider]) {
+    return ModelProviders[parsedConfig.config.provider]();
+  }
+
   return new BaseModelProvider(
     streamingModel,
     nonStreamingModel,
     capabilities,
     logger,
-    getCacheForModelProvider(getConfigKaiDemoMode(), logger, subDir(cacheDir ?? "")),
-    getCacheForModelProvider(getTraceEnabled(), logger, subDir(traceDir ?? ""), true),
+    cache,
+    tracer,
   );
 }

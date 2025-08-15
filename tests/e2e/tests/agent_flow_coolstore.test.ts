@@ -70,7 +70,7 @@ providers.forEach((config) => {
       const resolutionView = await vscodeApp.getView(KAIViews.resolutionDetails);
       await vscodeApp.waitDefault();
       let done = false;
-      let maxIterations = 1000; // just for safety against inf loops
+      let maxIterations = 200; // just for safety against inf loops
       let lastYesButtonCount = 0;
       while (!done) {
         maxIterations -= 1;
@@ -117,7 +117,6 @@ providers.forEach((config) => {
           await vscodeApp.waitDefault();
         }
       }
-      await vscodeApp.getWindow().waitForTimeout(100000);
     });
 
     test.afterEach(async () => {
