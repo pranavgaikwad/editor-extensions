@@ -121,6 +121,9 @@ export class KaiInteractiveWorkflow
       fsTools.all(),
       depTools.all(),
       workspaceDir,
+      this.logger.child({
+        component: "DiagnosticsNode",
+      }),
     );
     this.diagnosticsNodes.on("workflowMessage", async (msg: KaiWorkflowMessage) => {
       this.emitWorkflowMessage(msg);
@@ -337,6 +340,12 @@ export class KaiInteractiveWorkflow
       // followed by adding a dependency to the pom is roughly 10 iterations if
       // the agent can find the pom file in the first attempt
       recursionLimit: 3000,
+    });
+
+    this.emitWorkflowMessage({
+      id: "interactive_workflow_done",
+      type: KaiWorkflowMessageType.LLMResponseChunk,
+      data: new AIMessageChunk("Done addressing all issues. Goodbye!"),
     });
 
     return runResponse;

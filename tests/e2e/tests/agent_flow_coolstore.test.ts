@@ -69,21 +69,18 @@ providers.forEach((config) => {
       console.log('Fix button clicked');
       const resolutionView = await vscodeApp.getView(KAIViews.resolutionDetails);
       await vscodeApp.waitDefault();
-      const loadingIndicator = resolutionView.locator('div.loading-indicator');
-      console.log('Waiting for chat session to begin');
-      await expect(loadingIndicator.first()).toBeVisible({ timeout: 30000 });
-      console.log('Loading indicator found, chat session started');
-      let loadingIndicatorSeen = true;
+      let done = false;
       let maxIterations = 1000; // just for safety against inf loops
       let lastYesButtonCount = 0;
-      while (loadingIndicatorSeen) {
+      while (!done) {
         maxIterations -= 1;
         if (maxIterations <= 0) {
           throw new Error('Agent loop did not finish within 1000 iterations, this is unexpected');
         }
         // if the loading indicator is no longer visible, we have reached the end
-        if ((await resolutionView.locator('div.loading-indicator').count()) === 0) {
-          loadingIndicatorSeen = false;
+        if ((await resolutionView.getByText('Done addressing all issues. Goodbye!').count()) > 0) {
+          console.log('All issues have been addressed.');
+          done = true;
           break;
         }
         // either a Yes/No button or 'Accept all changes' button will be visible throughout the flow
@@ -94,15 +91,33 @@ providers.forEach((config) => {
         const yesButtonCount = await yesButton.count();
         if (yesButtonCount > lastYesButtonCount) {
           lastYesButtonCount = yesButtonCount;
+          await vscodeApp.waitDefault();
           await yesButton.last().click();
           console.log('Yes button clicked');
+          await vscodeApp.getWindow().screenshot({
+            path: pathlib.join(
+              SCREENSHOTS_FOLDER,
+              'agentic_flow_coolstore',
+              `${config.model.replace(/[.:]/g, '-')}`,
+              `${1000 - maxIterations}-yesNo.png`
+            ),
+          });
         } else if ((await acceptChangesLocator.count()) > 0) {
           await acceptChangesLocator.last().click();
           console.log('Accept all changes button clicked');
+          await vscodeApp.getWindow().screenshot({
+            path: pathlib.join(
+              SCREENSHOTS_FOLDER,
+              'agentic_flow_coolstore',
+              `${config.model.replace(/[.:]/g, '-')}`,
+              `${1000 - maxIterations}-tasks.png`
+            ),
+          });
         } else {
           await vscodeApp.waitDefault();
         }
       }
+      await vscodeApp.getWindow().waitForTimeout(100000);
     });
 
     test.afterEach(async () => {

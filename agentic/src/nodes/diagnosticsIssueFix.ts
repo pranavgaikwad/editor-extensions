@@ -1,4 +1,5 @@
 import * as pathlib from "path";
+import { Logger } from "winston";
 import {
   type AIMessageChunk,
   AIMessage,
@@ -41,6 +42,7 @@ export class DiagnosticsIssueFix extends BaseNode {
     fsTools: DynamicStructuredTool[],
     dependencyTools: DynamicStructuredTool[],
     private readonly workspaceDir: string,
+    private readonly logger: Logger,
   ) {
     super("DiagnosticsIssueFix", modelProvider, [...fsTools, ...dependencyTools]);
     this.diagnosticsPromises = new Map<string, PendingUserInteraction>();
@@ -137,6 +139,7 @@ export class DiagnosticsIssueFix extends BaseNode {
                 tasks: group.tasks.sort(),
               }))
               .sort((a, b) => a.uri.localeCompare(b.uri)) ?? [];
+          this.logger.debug("Received new tasks", { tasks: newTasks });
           if (!newTasks || newTasks.length < 1) {
             nextState.shouldEnd = true;
           }
@@ -152,6 +155,7 @@ export class DiagnosticsIssueFix extends BaseNode {
     // if there are any tasks left that planner already gave us, finish that work first
     if (state.plannerOutputNominatedAgents && state.plannerOutputNominatedAgents.length) {
       const nextSelection = state.plannerOutputNominatedAgents.pop();
+      this.logger.debug("Working on planner task", nextSelection);
       if (nextSelection) {
         const { name, instructions } = nextSelection;
         switch (name as AgentName) {
