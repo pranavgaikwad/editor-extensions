@@ -116,19 +116,23 @@ export async function getModelProviderFromConfig(
     supportsToolsInStreaming: false,
   };
   try {
+    let usingCachedHealthcheck = false;
     if (getConfigKaiDemoMode()) {
       const cachedHealthcheck = await cache.get("capabilities", {
         cacheSubDir: "healthcheck",
       });
       if (cachedHealthcheck) {
         capabilities = JSON.parse(cachedHealthcheck.content as string) as ModelCapabilities;
+        usingCachedHealthcheck = true;
       }
     }
-    capabilities = await runModelHealthCheck(streamingModel, nonStreamingModel);
-    if (getConfigKaiDemoMode()) {
-      await cache.set("capabilities", new AIMessage(JSON.stringify(capabilities)), {
-        cacheSubDir: "healthcheck",
-      });
+    if (!usingCachedHealthcheck) {
+      capabilities = await runModelHealthCheck(streamingModel, nonStreamingModel);
+      if (getConfigKaiDemoMode()) {
+        await cache.set("capabilities", new AIMessage(JSON.stringify(capabilities)), {
+          cacheSubDir: "healthcheck",
+        });
+      }
     }
   } catch (err) {
     logger.error("Error running model health check:", err);
