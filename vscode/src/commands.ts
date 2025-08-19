@@ -51,6 +51,7 @@ import {
   getTraceEnabled,
   getTraceDir,
   getConfigSolutionServerAuth,
+  fileUriToPath,
 } from "./utilities/configuration";
 import { promptForCredentials } from "./utilities/auth";
 import { runPartialAnalysis } from "./analysis";
@@ -544,12 +545,12 @@ const commandsMap: (
         openLabel: "Select Analyzer Binary",
         filters: isWindows
           ? {
-            "Executable Files": ["exe"],
-            "All Files": ["*"],
-          }
+              "Executable Files": ["exe"],
+              "All Files": ["*"],
+            }
           : {
-            "All Files": ["*"],
-          },
+              "All Files": ["*"],
+            },
       };
 
       const fileUri = await window.showOpenDialog(options);
@@ -732,8 +733,9 @@ const commandsMap: (
       // add logs and write zip
       try {
         const zipArchive = new AdmZip();
+        zipArchive.addLocalFolder(fileUriToPath(state.extensionContext.logUri.fsPath), "logs"); // add logs folder
         if (traceDirFound && includeLLMTraces === "Yes") {
-          zipArchive.addLocalFolder(traceDir as string);
+          zipArchive.addLocalFolder(traceDir as string, "traces");
         }
         if (providerConfigWritten) {
           zipArchive.addLocalFile(providerConfigPath);
