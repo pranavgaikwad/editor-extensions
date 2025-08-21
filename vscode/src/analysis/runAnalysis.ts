@@ -1,4 +1,6 @@
 import * as vscode from "vscode";
+import { ALL_REVISIONS } from "@editor-extensions/agentic";
+
 import { getConfigAnalyzeOnSave, getConfigAgentMode } from "../utilities";
 import { ExtensionState } from "../extensionState";
 import { BatchedAnalysisTrigger } from "./batchedAnalysisTrigger";
@@ -31,7 +33,7 @@ export const registerAnalysisTrigger = (
         return;
       }
 
-      await state.kaiFsCache.invalidate(d.uri.fsPath, { maxRevisions: -1 });
+      await state.kaiFsCache.invalidate(d.uri.fsPath, { maxRevisions: ALL_REVISIONS });
       batchedAnalysisTrigger.notifyFileChanges({
         path: d.uri,
         content: d.getText(),

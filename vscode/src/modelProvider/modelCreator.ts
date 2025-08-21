@@ -211,7 +211,7 @@ function getCaBundleAndInsecure(env: Record<string, string>): {
   const caBundle = env[PROVIDER_ENV_CA_BUNDLE];
   const insecureRaw = env[PROVIDER_ENV_INSECURE];
   let insecure = false;
-  if (insecureRaw && insecureRaw.match(/^([t|T][R|r][u|U][e|E])|1$/i)) {
+  if (insecureRaw && insecureRaw.match(/^(true|1)$/i)) {
     insecure = true;
   }
   return { caBundle, insecure };

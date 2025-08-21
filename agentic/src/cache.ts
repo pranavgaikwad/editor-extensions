@@ -117,6 +117,8 @@ export interface InMemoryCacheWithRevisionsOptions {
   maxRevisions: number;
 }
 
+export const ALL_REVISIONS = -1;
+
 /**
  * A memory-based cache implementation that caches generic inputs and outputs.
  * Supports storing multiple revisions of the same input. Useful for caching fs changes.
@@ -169,7 +171,7 @@ export class InMemoryCacheWithRevisions<K, V>
       return;
     }
     const revisionsToRemove = opts?.maxRevisions ?? 1;
-    if (revisionsToRemove === -1) {
+    if (revisionsToRemove === ALL_REVISIONS) {
       this.cache.delete(input);
       return;
     }
