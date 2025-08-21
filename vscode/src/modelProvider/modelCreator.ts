@@ -1,12 +1,7 @@
 import { Logger } from "winston";
 import { ChatOllama } from "@langchain/ollama";
 import { ChatDeepSeek } from "@langchain/deepseek";
-import {
-  AzureChatOpenAI,
-  type OpenAIChatInput,
-  ChatOpenAI,
-  ClientOptions,
-} from "@langchain/openai";
+import { AzureChatOpenAI, ChatOpenAI } from "@langchain/openai";
 import { ChatBedrockConverse, type ChatBedrockConverseInput } from "@langchain/aws";
 import { ChatGoogleGenerativeAI, type GoogleGenerativeAIChatInput } from "@langchain/google-genai";
 import { BaseChatModel } from "@langchain/core/language_models/chat_models";
@@ -169,17 +164,14 @@ class ChatOpenAICreator implements ModelCreator {
   constructor(private readonly logger: Logger) {}
 
   async create(args: Record<string, any>, env: Record<string, string>): Promise<BaseChatModel> {
-    const config: Partial<OpenAIChatInput> & {
-      configuration?: ClientOptions;
-    } = {
+    return new ChatOpenAI({
       openAIApiKey: env.OPENAI_API_KEY,
       ...args,
       configuration: {
         ...args.configuration,
         fetch: await getFetchFn(env, this.logger),
       },
-    };
-    return new ChatOpenAI(config);
+    });
   }
 
   defaultArgs(): Record<string, any> {
