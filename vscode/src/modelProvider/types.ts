@@ -8,6 +8,9 @@ export type SupportedModelProviders =
   | "ChatOllama"
   | "ChatOpenAI";
 
+export const PROVIDER_ENV_CA_BUNDLE = "CA_BUNDLE";
+export const PROVIDER_ENV_INSECURE = "ALLOW_INSECURE";
+
 /**
  * The config for a model. This is parsed from the yaml file and contains args as-is.
  */
@@ -31,8 +34,10 @@ export interface ParsedModelConfig {
 export interface ModelCreator {
   defaultArgs(): Record<string, any>;
   validate(args: Record<string, any>, env: Record<string, string>): void;
-  create(args: Record<string, any>, env: Record<string, string>): BaseChatModel;
+  create(args: Record<string, any>, env: Record<string, string>): Promise<BaseChatModel>;
 }
+
+export type FetchFn = (input: Request | URL | string, init?: RequestInit) => Promise<Response>;
 
 export interface ModelCapabilities {
   supportsTools: boolean;

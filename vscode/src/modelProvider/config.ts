@@ -77,20 +77,20 @@ export async function getModelProviderFromConfig(
   ) as Record<string, string>;
   const mergedEnv = { ...processEnvFiltered, ...parsedConfig.env };
 
-  const modelCreator = ModelCreators[parsedConfig.config.provider]();
+  const modelCreator = ModelCreators[parsedConfig.config.provider](logger);
   const defaultArgs = modelCreator.defaultArgs();
   const configArgs = parsedConfig.config.args;
   //NOTE (pgaikwad) - this overwrites nested properties of defaultargs with configargs
   const args = { ...defaultArgs, ...configArgs };
   modelCreator.validate(args, mergedEnv);
-  const streamingModel = modelCreator.create(
+  const streamingModel = await modelCreator.create(
     {
       ...args,
       streaming: true,
     },
     mergedEnv,
   );
-  const nonStreamingModel = modelCreator.create(
+  const nonStreamingModel = await modelCreator.create(
     {
       ...args,
       streaming: false,
@@ -136,10 +136,7 @@ export async function getModelProviderFromConfig(
     }
   } catch (err) {
     logger.error("Error running model health check:", err);
-    if (!getConfigKaiDemoMode()) {
-      // only throw error when we are not in demo mode
-      throw err;
-    }
+    throw err;
   }
 
   if (ModelProviders[parsedConfig.config.provider]) {
