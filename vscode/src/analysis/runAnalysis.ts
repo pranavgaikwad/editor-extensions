@@ -31,7 +31,7 @@ export const registerAnalysisTrigger = (
         return;
       }
 
-      await state.kaiFsCache.invalidate(d.uri.fsPath);
+      await state.kaiFsCache.invalidate(d.uri.fsPath, { maxRevisions: -1 });
       batchedAnalysisTrigger.notifyFileChanges({
         path: d.uri,
         content: d.getText(),

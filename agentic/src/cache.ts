@@ -169,6 +169,10 @@ export class InMemoryCacheWithRevisions<K, V>
       return;
     }
     const revisionsToRemove = opts?.maxRevisions ?? 1;
+    if (revisionsToRemove === -1) {
+      this.cache.delete(input);
+      return;
+    }
     for (let i = 0; i < revisionsToRemove && stack.length > 0; i++) {
       stack.pop();
     }
