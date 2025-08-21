@@ -3,6 +3,8 @@
 ---
 environment:
   ALWAYS_APPLIED_KEY: "envvar to be set regardless of which model is active"
+  # CA_BUNDLE: "" # optional
+  # ALLOW_INSECURE: "false" # optional
 
 # This is a collection of model configurations that may be used.  The `&active`
 # anchor is used to reference the model to the active node below.  The extension will
