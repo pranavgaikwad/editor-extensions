@@ -109,18 +109,29 @@ export class AnalyzerClient {
     const startTime = performance.now();
 
     const pipeName = rpc.generateRandomPipeName();
-    const [analyzerRpcServer, analyzerPid] = await this.startAnalysisServer(pipeName);
+    const [analyzerRpcServer, analyzerPid] = this.startAnalysisServer(pipeName);
     analyzerRpcServer.on("exit", (code, signal) => {
       this.logger.info(`Analyzer RPC server terminated [signal: ${signal}, code: ${code}]`);
+      if (code) {
+        vscode.window.showErrorMessage(
+          `Analyzer RPC server failed. Status code: ${code}. Please see the output channel for details.`,
+        );
+      }
       this.fireServerStateChange("stopped");
+      this.analyzerRpcServer = null;
     });
     analyzerRpcServer.on("close", (code, signal) => {
       this.logger.info(`Analyzer RPC server closed [signal: ${signal}, code: ${code}]`);
       this.fireServerStateChange("stopped");
+      this.analyzerRpcServer = null;
     });
     analyzerRpcServer.on("error", (err) => {
       this.logger.error("Analyzer RPC server error", err);
       this.fireServerStateChange("startFailed");
+      this.analyzerRpcServer = null;
+      vscode.window.showErrorMessage(
+        `Analyzer RPC server failed - ${err instanceof Error ? err.message : String(err)}`,
+      );
     });
     this.analyzerRpcServer = analyzerRpcServer;
     this.logger.info(`Analyzer RPC server started successfully [pid: ${analyzerPid}]`);
@@ -150,7 +161,7 @@ export class AnalyzerClient {
     writer.onError((e) => {
       this.logger.error("Error in message writer", e);
     });
-    this.analyzerRpcConnection = await rpc.createMessageConnection(reader, writer);
+    this.analyzerRpcConnection = rpc.createMessageConnection(reader, writer);
     this.analyzerRpcConnection.trace(
       rpc.Trace.Messages,
       {
@@ -171,6 +182,7 @@ export class AnalyzerClient {
 
     this.analyzerRpcConnection.onNotification("started", (_: []) => {
       this.logger.info("Server initialization complete");
+      this.fireServerStateChange("running");
     });
     this.analyzerRpcConnection.onNotification((method: string, params: any) => {
       this.logger.debug(`Received notification: ${method} + ${JSON.stringify(params)}`);
@@ -205,7 +217,6 @@ export class AnalyzerClient {
     });
     this.analyzerRpcConnection.listen();
     this.analyzerRpcConnection.sendNotification("start", { type: "start" });
-    this.fireServerStateChange("running");
     await this.runHealthCheck();
     this.logger.info(`startAnalyzer took ${performance.now() - startTime}ms`);
   }
